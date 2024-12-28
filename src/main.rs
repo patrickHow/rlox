@@ -1,4 +1,4 @@
-use std::string;
+// mod vm;
 
 // TODO this all needs to be split to individual files
 
@@ -9,8 +9,10 @@ type ConstantType = f64;
 // OPCODES - defining as u8 instead of enum so we can do direct comparisons
 // without all kinds of nasty casting 
 
-const OP_CONSTANT: u8 = 0; // [opcode][constant index]
-const OP_RETURN: u8 = 1; // [opcode]
+const OP_CONSTANT: u8 = 0; // [opcode][constant index] - pushes a constant to the stack
+const OP_RETURN: u8 = 1; // [opcode] - pops a constant from the stack and prints it
+const OP_NEGATE: u8 = 2; // [opcode] - negates the value at the top of the stack
+
 
 
 fn simple_instruction(name: String, offset: usize) -> usize {
@@ -64,6 +66,7 @@ impl Chunk {
         match instruction {
             OP_RETURN => simple_instruction("OP_RETURN".to_string(), offset),
             OP_CONSTANT => self.constant_instruction("OP_CONSTANT".to_string(), offset),
+            OP_NEGATE => simple_instruction("OP_NEGATE".to_string(), offset),
             _ => {
                 println!("Invalid opcode {instruction}");
                 offset + 1 // Advance past the bad instruction
@@ -96,15 +99,88 @@ impl Chunk {
     }
 }
 
+struct VM {
+    chunk: Chunk, // The current chunk being executed
+    ip: usize, // Instruction pointer - an index into the code array in the vector
+    stack: Vec<ConstantType>, // A stack for values in the VM 
+}
+
+enum InterpretResult {
+    OK,
+    CompileError,
+    RuntimeError,
+}
+
+impl VM {
+    fn new(initial: Chunk) -> VM {
+        Self {
+            chunk: initial,
+            ip: 0,
+            stack: Vec::new(),
+        }
+    }
+
+    fn reset_stack(&mut self) {
+        self.stack.clear();
+    }
+
+    fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
+        self.chunk = chunk;
+        self.ip = 0;
+        self.run()
+    }
+
+    fn run(&mut self) -> InterpretResult {
+        loop {
+            if cfg!(debug_assertions) {
+                // Dump the stack trace
+                for val in &self.stack {
+                    print!("[{val}]");
+                }
+                println!();
+
+                // Print instruction about to be executed
+                self.chunk.disassemble_instruction(self.ip);
+            }
+            let instruction = self.chunk.code[self.ip];
+            self.ip += 1;
+
+            match instruction {
+                OP_CONSTANT => {
+                    let ind = self.chunk.code[self.ip] as usize;
+                    self.ip += 1;
+                    let val = self.chunk.constants[ind];
+                    self.stack.push(val);
+                }
+                OP_RETURN => {
+                    let val = self.stack.pop().unwrap();
+                    println!("{val}");
+                    return InterpretResult::OK
+                }
+                OP_NEGATE => {
+                    let top_idx = self.stack.len() - 1;
+                    self.stack[top_idx] = -self.stack[top_idx];
+                }
+                _ => return InterpretResult::RuntimeError,
+            }
+        }
+    }
+}
+
 
 fn main() {
+    let dummy_chunk = Chunk::new();
     let mut chunk = Chunk::new();
     // Basic hand-spun code to test the chunk type
     // Arbitrary line number for now
     let ind = chunk.add_constant(1.2);
     chunk.write(OP_CONSTANT, 123);
     chunk.write(ind, 123);
+    chunk.write(OP_NEGATE, 123);
     chunk.write(OP_RETURN, 123);
 
-    chunk.disassemble("test chunk".to_string());
+    println!("Code execution starting...");
+
+    let mut vm = VM::new(dummy_chunk);
+    vm.interpret(chunk);
 }
