@@ -28,13 +28,17 @@ impl Interpreter {
     }
 
     fn interpret(&mut self, source: String) -> vm::InterpretResult {
-        self.compiler.compile(source);
-        return vm::InterpretResult::OK;
+        
+        if let Some(chunk) = self.compiler.compile(source) {
+            return self.vm.run(chunk);
+        } else {
+            return vm::InterpretResult::CompileError;
+        }
     }
 
     fn repl(&mut self) {
         loop {
-            print!("> ");
+            println!("> ");
     
             let mut line = String::new();
             io::stdin().read_line(&mut line).unwrap();

@@ -1,5 +1,5 @@
 // Define token types possible in Lox
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen = 0,
@@ -48,6 +48,7 @@ pub enum TokenType {
     While,
 
     // Special tokens
+    Error,
     Eof,
 }
 
@@ -75,8 +76,24 @@ impl TokenType {
     }
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub token_type: TokenType,
-    pub lexeme: String,
+    pub lexeme: String, // This might not be as efficient as &str but holy hell the lifetimes
     pub line: u32,
+}
+
+impl Token {
+    pub fn error(&self, msg: String) {
+        print!("[Line {}] Error", self.line);
+        if self.token_type == TokenType::Eof {
+            print!(" at end");
+        } else if self.token_type == TokenType::Error {
+            // nothing to print
+        } else {
+            print!(" at {}", self.lexeme);
+        }
+
+        println!(": {}", msg);
+    }
 }

@@ -3,7 +3,6 @@ use std::iter::Scan;
 use crate::token::{TokenType, Token};
 
 pub struct Scanner {
-    source: String,
     start: usize, // Start of current token
     current: usize, // Current character being examined within token
     line: u32,  // Current line number
@@ -11,15 +10,21 @@ pub struct Scanner {
 
 // Result<> error values for scanning
 #[derive(Debug)]
-pub enum ScanError {
-    InvalidCharacter(char), 
-    UnterminatedString, 
+pub struct ScanError {
+    msg: String, 
+    text: String,
+    line: u32, 
+}
+
+impl ScanError {
+    pub fn print_error(&self) {
+        println!("{} Error: {} at text: {}", self.line, self.msg, self.text);
+    }
 }
 
 impl Scanner {
-    pub fn new(source: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            source,
             start: 0,
             current: 0,
             line: 1,
@@ -27,160 +32,168 @@ impl Scanner {
     }
 
     // Scan and return the next token from the source
-    pub fn scan_token(&mut self) -> Result<Token, ScanError> {
-        self.skip_whitespace();
+    pub fn scan_token(&mut self, source: & str) -> Result<Token, ScanError> {
+        self.skip_whitespace(&source);
         self.start = self.current;
 
-        if self.is_at_end() {
-            return Ok(self.make_token(TokenType::Eof));
+        if self.is_at_end(&source) {
+            return Ok(self.make_token(&source, TokenType::Eof));
         }
 
         // Scan the next character
-        let c = self.advance();
+        let c = self.advance(&source);
         match c {
             // Single character tokens first
-            '(' => Ok(self.make_token(TokenType::LeftParen)),
-            ')' => Ok(self.make_token(TokenType::RightParen)),
-            '{' => Ok(self.make_token(TokenType::LeftBrace)),
-            '}' => Ok(self.make_token(TokenType::RightBrace)),
-            ',' => Ok(self.make_token(TokenType::Comma)),
-            ';' => Ok(self.make_token(TokenType::Semicolon)),
-            '.' => Ok(self.make_token(TokenType::Dot)),
-            '+' => Ok(self.make_token(TokenType::Plus)),
-            '-' => Ok(self.make_token(TokenType::Minus)),
-            '*' => Ok(self.make_token(TokenType::Star)),
-            '/' => Ok(self.make_token(TokenType::FSlash)),
+            '(' => Ok(self.make_token(&source, TokenType::LeftParen)),
+            ')' => Ok(self.make_token(&source, TokenType::RightParen)),
+            '{' => Ok(self.make_token(&source, TokenType::LeftBrace)),
+            '}' => Ok(self.make_token(&source, TokenType::RightBrace)),
+            ',' => Ok(self.make_token(&source, TokenType::Comma)),
+            ';' => Ok(self.make_token(&source, TokenType::Semicolon)),
+            '.' => Ok(self.make_token(&source, TokenType::Dot)),
+            '+' => Ok(self.make_token(&source, TokenType::Plus)),
+            '-' => Ok(self.make_token(&source, TokenType::Minus)),
+            '*' => Ok(self.make_token(&source, TokenType::Star)),
+            '/' => Ok(self.make_token(&source, TokenType::FSlash)),
 
             // Characters that MAY be two characters
             '!' => {
-                if self.match_next('=') {
-                    Ok(self.make_token(TokenType::BangEqual))
+                if self.match_next(&source, '=') {
+                    Ok(self.make_token(&source, TokenType::BangEqual))
                 } else {
-                    Ok(self.make_token(TokenType::Bang))
+                    Ok(self.make_token(&source, TokenType::Bang))
                 }
             },
 
             '=' => {
-                if self.match_next('=') {
-                    Ok(self.make_token(TokenType::EqualEqual))
+                if self.match_next(&source, '=') {
+                    Ok(self.make_token(&source, TokenType::EqualEqual))
                 } else {
-                    Ok(self.make_token(TokenType::Equal))
+                    Ok(self.make_token(&source, TokenType::Equal))
                 }
             },
 
             '<' => {
-                if self.match_next('=') {
-                    Ok(self.make_token(TokenType::LessEqual))
+                if self.match_next(&source, '=') {
+                    Ok(self.make_token(&source, TokenType::LessEqual))
                 } else {
-                    Ok(self.make_token(TokenType::Less))
+                    Ok(self.make_token(&source, TokenType::Less))
                 }
             },
 
             '>' => {
-                if self.match_next('=') {
-                    Ok(self.make_token(TokenType::GreaterEqual))
+                if self.match_next(&source, '=') {
+                    Ok(self.make_token(&source, TokenType::GreaterEqual))
                 } else {
-                    Ok(self.make_token(TokenType::Greater))
+                    Ok(self.make_token(&source, TokenType::Greater))
                 }
             },
             // A double quote should indicate the start of a string literal
-            '"' => self.string(),
+            '"' => self.string(&source),
             // Any numeric characters are a number literal
-            '0'..='9' => self.number(),
+            '0'..='9' => self.number(&source),
 
             // Identifiers must start with a letter or an _
-            'a' ..='z' | 'A' ..='Z' | '_' => self.identifier(),
+            'a' ..='z' | 'A' ..='Z' | '_' => self.identifier(&source),
 
 
-            _ => Err(ScanError::InvalidCharacter(c)),
+            _ => Err(ScanError {
+                msg: "Invalid character".to_string(),
+                text: source[self.start..self.current].to_string(),
+                line: self.line,
+            }),
         }
     }
 
-    fn string(&mut self) -> Result<Token, ScanError> {
+    fn string(&mut self, source: & str) -> Result<Token, ScanError> {
         // Consume characters until we reach a closing quote
-        while self.peek().unwrap() != '"' && self.is_at_end() == false {
+        while self.peek(source).unwrap() != '"' && self.is_at_end(&source) == false {
             // Support newlines within string literals
-            if self.peek().unwrap() == '\n' {
+            if self.peek(&source).unwrap() == '\n' {
                 self.line += 1;
             }
-            self.advance();
+            self.advance(&source);
         }
 
-        if self.is_at_end() {
-            return Err(ScanError::UnterminatedString)
+        if self.is_at_end(&source) {
+            return Err(ScanError {
+                msg: "Unterminated string".to_string(),
+                text: source[self.start..self.current].to_string(),
+                line: self.line,
+            })
         }
         // Advance past the final terminating quote 
-        self.advance();
-        return Ok(self.make_token(TokenType::String))
+        self.advance(&source);
+        return Ok(self.make_token(&source, TokenType::String))
     }
 
-    fn number(&mut self) -> Result<Token, ScanError> {
-        while self.peek().unwrap().is_digit(10) {
-            self.advance();
+    fn number(&mut self, source: & str) -> Result<Token, ScanError> {
+        while self.peek(&source).unwrap().is_digit(10) {
+            self.advance(&source);
         }
 
         // See if we have a fractional part
-        if self.peek().unwrap() == '.' && self.peek_next().unwrap().is_digit(10) {
+        if self.peek(&source).unwrap() == '.' && self.peek_next(&source).unwrap().is_digit(10) {
             // Consume the '.'
-            self.advance();
+            self.advance(&source);
             // Consume the rest of the number 
-            while self.peek().unwrap().is_digit(10) {
-                self.advance();
+            while self.peek(&source).unwrap().is_digit(10) {
+                self.advance(&source);
             }       
         }
 
-        return Ok(self.make_token(TokenType::Number))
+        return Ok(self.make_token(&source, TokenType::Number))
     }
 
-    fn identifier(&mut self) -> Result<Token, ScanError> {
+    fn identifier(&mut self, source: & str) -> Result<Token, ScanError> {
         // Scan out the rest of the identifier - we allow
         // numeric characters as well as digits 
-        while self.peek().unwrap().is_ascii_alphanumeric() {
-            self.advance();
+        while self.peek(&source).unwrap().is_ascii_alphanumeric() {
+            self.advance(&source);
         }
 
-        let text = &self.source[self.start..self.current];
+        let text = &source[self.start..self.current];
         let token_type = TokenType::from_keyword(text).unwrap_or(TokenType::Identifier);
-        Ok(self.make_token(token_type))
+        Ok(self.make_token(&source, token_type))
     }
 
     // Make a token struct from the current state of the scanner
-    fn make_token(&self, token_type: TokenType) -> Token {
+    fn make_token(&self, source: & str, token_type: TokenType) -> Token {
         Token {
             token_type,
-            lexeme: self.source[self.start..self.current].to_string(),
+            lexeme: source[self.start..self.current].to_string(),
             line: self.line,
         }
     }
 
-    fn advance(&mut self) -> char {
+    fn advance(&mut self, source: & str) -> char {
         self.current += 1;
-        self.source.chars().nth(self.current - 1).unwrap()
+        source.chars().nth(self.current - 1).unwrap()
     }
 
     // Look at the current character without consuming it
-    fn peek(&self) -> Option<char> {
-        self.source.chars().nth(self.current)
+    fn peek(&self, source: & str) -> Option<char> {
+        source.chars().nth(self.current)
     }
 
     // Look at the NEXT character without consuming it 
-    fn peek_next(&self) -> Option<char> {
-        if self.is_at_end() {
+    fn peek_next(&self, source: & str) -> Option<char> {
+        if self.is_at_end(&source) {
             return Some('\0')
         }
-        self.source.chars().nth(self.current + 1)
+        source.chars().nth(self.current + 1)
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
+    fn is_at_end(&self, source: & str) -> bool {
+        self.current >= source.len()
     }
 
-    fn match_next(&mut self, expected: char) -> bool {
-        if self.is_at_end() {
+    fn match_next(&mut self, source: & str, expected: char) -> bool {
+        if self.is_at_end(source) {
             return false
         }
 
-        if self.source.chars().nth(self.current).unwrap() != expected {
+        if source.chars().nth(self.current).unwrap() != expected {
             return false
         }
 
@@ -189,21 +202,21 @@ impl Scanner {
         return true; 
     }
 
-    fn skip_whitespace(&mut self) {
-        while let Some(c) = self.peek() {
+    fn skip_whitespace(&mut self, source: & str) {
+        while let Some(c) = self.peek(&source) {
             match c {
                 ' ' | '\r' | '\t' => {
-                    self.advance();
+                    self.advance(&source);
                 }
                 '\n' => {
                     self.line += 1;
-                    self.advance();
+                    self.advance(&source);
                 }
                 '/' => {
                     // Two '/' in a row indicates a comment line
-                    if self.peek_next().unwrap() == '/' {
-                        while self.peek().unwrap() != '\n' && self.is_at_end() == false {
-                            self.advance();
+                    if self.peek_next(source).unwrap() == '/' {
+                        while self.peek(&source).unwrap() != '\n' && self.is_at_end(&source) == false {
+                            self.advance(&source);
                         }
                     } else {
                         // Not part of a comment, return without advancing so this char can be tokenized
@@ -214,6 +227,4 @@ impl Scanner {
             }
         }
     }
-    
-
 }
