@@ -1,5 +1,3 @@
-use std::iter::Scan;
-
 use crate::token::{TokenType, Token};
 
 pub struct Scanner {

@@ -51,11 +51,12 @@ impl Interpreter {
         let source = fs::read_to_string(filepath).expect("Error reading file");
         self.interpret(source);
     }
-
-
 }
 
 fn main() {
+
+    // Turn on for backtrace on panic
+    // env::set_var("RUST_BACKTRACE", "1");
 
     let mut interpreter = Interpreter::new();
 

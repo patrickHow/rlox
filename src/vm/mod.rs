@@ -30,7 +30,8 @@ impl VM {
         }
     }
 
-    fn reset_stack(&mut self) {
+    fn reset(&mut self) {
+        self.ip = 0;
         self.stack.clear();
     }
 
@@ -41,6 +42,9 @@ impl VM {
     }
 
     pub fn run(&mut self, chunk: chunk::Chunk) -> InterpretResult {
+
+        self.reset();
+
         loop {
             if cfg!(debug_assertions) {
                 // Dump the stack trace

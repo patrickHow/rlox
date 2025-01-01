@@ -83,7 +83,6 @@ impl Chunk {
 
     // Write a constant value to the chunk
     // Returns the index of the added value for later use
-    // TODO fix if we need more than 256 constants per chunk (but...why)
     pub fn add_constant(&mut self, value: f64) -> u8 {
         self.constants.push(value);
         return (self.constants.len() - 1) as u8

@@ -52,6 +52,10 @@ pub enum TokenType {
     Eof,
 }
 
+// One day this will be stabilized, for now we manually maintain
+// pub const TOKEN_COUNT: usize = variant_count::<TokenType>();
+pub const TOKEN_COUNT: usize = 40;
+
 impl TokenType {
     pub fn from_keyword(keyword: &str) -> Option<TokenType> {
         match keyword {
