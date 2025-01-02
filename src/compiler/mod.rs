@@ -1,8 +1,8 @@
 use crate::chunk::Chunk;
 use crate::opcodes::{self};
 use crate::scanner::Scanner;
-use crate::value::Value;
 use crate::token::{Token, TokenType, TOKEN_COUNT};
+use crate::value::Value;
 use core::panic;
 use std::ops::Add;
 
@@ -12,15 +12,15 @@ const MAX_EXPRESSION_NESTING: u32 = 50;
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 enum Precedence {
     None = 0,
-    Assignment, // = 
-    Or, // or 
-    And, // and
-    Equality, // == !=
+    Assignment, // =
+    Or,         // or
+    And,        // and
+    Equality,   // == !=
     Comparison, // < > <= >=
-    Term, // + -
-    Factor, // * /
-    Unary, // ! -
-    Call, // . ()
+    Term,       // + -
+    Factor,     // * /
+    Unary,      // ! -
+    Call,       // . ()
     Primary,
 }
 
@@ -32,7 +32,7 @@ impl Add<u8> for Precedence {
         // Safety: ensure result maps to valid variant
         match result {
             x if x <= (Precedence::Primary as u8) => unsafe { std::mem::transmute(result) },
-            _ => Precedence::Primary // Or handle error case
+            _ => Precedence::Primary, // Or handle error case
         }
     }
 }
@@ -44,18 +44,23 @@ struct ParseRule {
 }
 
 impl ParseRule {
-    const fn new(prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
-    infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
-    precedence: Precedence,) -> Self {
-        Self {prefix, infix, precedence}
+    const fn new(
+        prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
+        infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
+        precedence: Precedence,
+    ) -> Self {
+        Self {
+            prefix,
+            infix,
+            precedence,
+        }
     }
 }
 
-
-struct Parser{
-    source: String,  // Parser explicitly owns the source string
+struct Parser {
+    source: String, // Parser explicitly owns the source string
     scanner: Scanner,
-    current: Token, 
+    current: Token,
     previous: Token,
     has_error: bool,
     panic_mode: bool,
@@ -76,13 +81,13 @@ impl Parser {
                 lexeme: "".to_string(),
                 line: 0,
             },
-            has_error: false, 
+            has_error: false,
             panic_mode: false,
         }
     }
 
     fn advance(&mut self) {
-        // TODO find a better way to do this 
+        // TODO find a better way to do this
         self.previous = self.current.clone();
 
         match self.scanner.scan_token(&self.source) {
@@ -111,27 +116,26 @@ impl Parser {
 
     fn error_on_prev(&mut self, msg: String) {
         if self.panic_mode {
-            return
+            return;
         }
         self.panic_mode = true;
-        self.has_error = true; 
+        self.has_error = true;
 
         self.previous.error(msg);
     }
 
     fn error_on_current(&mut self, msg: String) {
         if self.panic_mode {
-            return
+            return;
         }
         self.panic_mode = true;
-        self.has_error = true; 
+        self.has_error = true;
 
         self.current.error(msg);
     }
-    
 }
 
-pub struct Compiler{
+pub struct Compiler {
     expression_depth: u32, // Track the nesting depth of the expression being compiled
 }
 
@@ -150,13 +154,12 @@ impl Compiler {
         parser.advance();
         self.expression(&mut parser, &mut chunk);
         parser.consume(TokenType::Eof, "Expected end of expression".to_string());
-        
-        
+
         self.end(&mut chunk, parser.previous.line);
         if parser.has_error {
-            return None
+            return None;
         } else {
-            return Some(chunk)
+            return Some(chunk);
         }
     }
 
@@ -168,7 +171,6 @@ impl Compiler {
         }
 
         self.parse_precedence(parser, chunk, Precedence::Assignment);
-
 
         self.expression_depth -= 1;
     }
@@ -183,8 +185,8 @@ impl Compiler {
         // Otherwise, call the function to parse the token
         match rule.prefix {
             None => {
-                 parser.previous.error("Expected expression".to_string());
-                 return
+                parser.previous.error("Expected expression".to_string());
+                return;
             }
             Some(parse_fn) => {
                 parse_fn(self, chunk, parser);
@@ -199,14 +201,12 @@ impl Compiler {
                 None => {
                     parser.previous.error("No rule to parse token".to_string());
                     return;
-                } 
+                }
                 Some(parse_fn) => {
                     parse_fn(self, chunk, parser);
                 }
             }
         }
-
-
     }
 
     fn emit_byte(&self, byte: u8, chunk: &mut Chunk, line: u32) {
@@ -232,7 +232,6 @@ impl Compiler {
 
         // Add the constant opcode and index to the chunk
         self.emit_bytes(opcodes::OP_CONSTANT, ind, chunk, line);
-
     }
 
     // Compiles a number literal
@@ -245,7 +244,10 @@ impl Compiler {
     // Recursively compile a grouping within parentheses
     fn grouping(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         self.expression(parser, chunk);
-        parser.consume(TokenType::RightParen, "Expected ')' after expression".to_string() );
+        parser.consume(
+            TokenType::RightParen,
+            "Expected ')' after expression".to_string(),
+        );
     }
 
     // Compiles a unary operation, such as negation
@@ -276,61 +278,60 @@ impl Compiler {
             _ => panic!("Invalid binary op type"),
         }
     }
-    
 }
 
 fn get_rule(token_type: TokenType) -> &'static ParseRule {
     // Static array is initialized at compile time
     static RULES: [ParseRule; TOKEN_COUNT] = [
         // Single-character tokens
-        ParseRule::new(Some(Compiler::grouping), None, Precedence::None),      // LeftParen
-        ParseRule::new(None, None, Precedence::None),                          // RightParen
-        ParseRule::new(None, None, Precedence::None),                          // LeftBrace 
-        ParseRule::new(None, None, Precedence::None),                          // RightBrace
-        ParseRule::new(None, None, Precedence::None),                          // Comma
-        ParseRule::new(None, None, Precedence::None),                          // Dot
-        ParseRule::new(Some(Compiler::unary), Some(Compiler::binary), Precedence::Term),    // Minus
-        ParseRule::new(None, Some(Compiler::binary), Precedence::Term),        // Plus
-        ParseRule::new(None, None, Precedence::None),                          // Semicolon
-        ParseRule::new(None, Some(Compiler::binary), Precedence::Factor),      // FSlash
-        ParseRule::new(None, Some(Compiler::binary), Precedence::Factor),      // Star
-
+        ParseRule::new(Some(Compiler::grouping), None, Precedence::None), // LeftParen
+        ParseRule::new(None, None, Precedence::None),                     // RightParen
+        ParseRule::new(None, None, Precedence::None),                     // LeftBrace
+        ParseRule::new(None, None, Precedence::None),                     // RightBrace
+        ParseRule::new(None, None, Precedence::None),                     // Comma
+        ParseRule::new(None, None, Precedence::None),                     // Dot
+        ParseRule::new(
+            Some(Compiler::unary),
+            Some(Compiler::binary),
+            Precedence::Term,
+        ), // Minus
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Term),   // Plus
+        ParseRule::new(None, None, Precedence::None),                     // Semicolon
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Factor), // FSlash
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Factor), // Star
         // One or two character tokens
-        ParseRule::new(None, None, Precedence::None),                          // Bang
-        ParseRule::new(None, None, Precedence::None),                          // BangEqual
-        ParseRule::new(None, None, Precedence::None),                          // Equal
-        ParseRule::new(None, None, Precedence::None),                          // EqualEqual
-        ParseRule::new(None, None, Precedence::None),                          // Greater
-        ParseRule::new(None, None, Precedence::None),                          // GreaterEqual
-        ParseRule::new(None, None, Precedence::None),                          // Less
-        ParseRule::new(None, None, Precedence::None),                          // LessEqual
-
+        ParseRule::new(None, None, Precedence::None), // Bang
+        ParseRule::new(None, None, Precedence::None), // BangEqual
+        ParseRule::new(None, None, Precedence::None), // Equal
+        ParseRule::new(None, None, Precedence::None), // EqualEqual
+        ParseRule::new(None, None, Precedence::None), // Greater
+        ParseRule::new(None, None, Precedence::None), // GreaterEqual
+        ParseRule::new(None, None, Precedence::None), // Less
+        ParseRule::new(None, None, Precedence::None), // LessEqual
         // Literals
-        ParseRule::new(None, None, Precedence::None),                          // Identifier
-        ParseRule::new(None, None, Precedence::None),                          // String
-        ParseRule::new(Some(Compiler::number), None, Precedence::None),        // Number
-
+        ParseRule::new(None, None, Precedence::None), // Identifier
+        ParseRule::new(None, None, Precedence::None), // String
+        ParseRule::new(Some(Compiler::number), None, Precedence::None), // Number
         // Keywords
-        ParseRule::new(None, None, Precedence::None),                          // And
-        ParseRule::new(None, None, Precedence::None),                          // Class
-        ParseRule::new(None, None, Precedence::None),                          // Else
-        ParseRule::new(None, None, Precedence::None),                          // False
-        ParseRule::new(None, None, Precedence::None),                          // For
-        ParseRule::new(None, None, Precedence::None),                          // Fun
-        ParseRule::new(None, None, Precedence::None),                          // If
-        ParseRule::new(None, None, Precedence::None),                          // Nil
-        ParseRule::new(None, None, Precedence::None),                          // Or
-        ParseRule::new(None, None, Precedence::None),                          // Print
-        ParseRule::new(None, None, Precedence::None),                          // Return
-        ParseRule::new(None, None, Precedence::None),                          // Super
-        ParseRule::new(None, None, Precedence::None),                          // This
-        ParseRule::new(None, None, Precedence::None),                          // True
-        ParseRule::new(None, None, Precedence::None),                          // Var
-        ParseRule::new(None, None, Precedence::None),                          // While
-
+        ParseRule::new(None, None, Precedence::None), // And
+        ParseRule::new(None, None, Precedence::None), // Class
+        ParseRule::new(None, None, Precedence::None), // Else
+        ParseRule::new(None, None, Precedence::None), // False
+        ParseRule::new(None, None, Precedence::None), // For
+        ParseRule::new(None, None, Precedence::None), // Fun
+        ParseRule::new(None, None, Precedence::None), // If
+        ParseRule::new(None, None, Precedence::None), // Nil
+        ParseRule::new(None, None, Precedence::None), // Or
+        ParseRule::new(None, None, Precedence::None), // Print
+        ParseRule::new(None, None, Precedence::None), // Return
+        ParseRule::new(None, None, Precedence::None), // Super
+        ParseRule::new(None, None, Precedence::None), // This
+        ParseRule::new(None, None, Precedence::None), // True
+        ParseRule::new(None, None, Precedence::None), // Var
+        ParseRule::new(None, None, Precedence::None), // While
         // Special tokens
-        ParseRule::new(None, None, Precedence::None),                          // Error
-        ParseRule::new(None, None, Precedence::None),                          // Eof
+        ParseRule::new(None, None, Precedence::None), // Error
+        ParseRule::new(None, None, Precedence::None), // Eof
     ];
     &RULES[token_type as usize]
 }

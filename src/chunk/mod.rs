@@ -11,7 +11,7 @@ pub struct Chunk {
 
 fn simple_instruction(name: String, offset: usize) -> usize {
     println!("{name}");
-    return offset + 1
+    return offset + 1;
 }
 
 impl Chunk {
@@ -23,14 +23,14 @@ impl Chunk {
         }
     }
 
-    // Debug function for disassembling a whole chunk 
+    // Debug function for disassembling a whole chunk
     pub fn disassemble(&self, name: String) {
         // Print a header for convenience
         println!("== {} ==", name);
 
         let mut offset = 0;
 
-        // Disassemble each instruction in the chunk 
+        // Disassemble each instruction in the chunk
         // Note that we skip the offset forward in the return to account for
         // differing byte lengths of instructions
         while offset < self.code.len() {
@@ -40,7 +40,6 @@ impl Chunk {
 
     // Disassemble an individual instruction
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
-        
         // Print the offset in the chunk as well as the line number
         print!("{offset:>4} ");
         if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
@@ -48,7 +47,7 @@ impl Chunk {
         } else {
             print!("{:>4} ", self.lines[offset]);
         }
-        
+
         let instruction = self.code[offset];
         match instruction {
             opcodes::OP_RETURN => simple_instruction("OP_RETURN".to_string(), offset),
@@ -62,14 +61,14 @@ impl Chunk {
             _ => {
                 println!("Invalid opcode {instruction}");
                 offset + 1 // Advance past the bad instruction
-            },
+            }
         }
     }
 
-    // Disassemble helper for constant instruction 
+    // Disassemble helper for constant instruction
     fn constant_instruction(&self, name: String, offset: usize) -> usize {
         // Second byte of the instruction will the index of the constant
-        // in the chunk's constant array 
+        // in the chunk's constant array
         let ind = self.code[offset + 1] as usize;
         let value = &self.constants[ind];
         print!("{name}: ");
@@ -88,6 +87,6 @@ impl Chunk {
     // Returns the index of the added value for later use
     pub fn add_constant(&mut self, value: Value) -> u8 {
         self.constants.push(value);
-        return (self.constants.len() - 1) as u8
+        return (self.constants.len() - 1) as u8;
     }
 }

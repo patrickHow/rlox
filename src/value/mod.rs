@@ -1,4 +1,3 @@
-
 // Enum wrapping the types that a Lox variable can have
 #[derive(Debug, Clone, Copy)]
 pub enum Value {

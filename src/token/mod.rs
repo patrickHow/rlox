@@ -3,13 +3,13 @@
 pub enum TokenType {
     // Single-character tokens
     LeftParen = 0,
-    RightParen, 
+    RightParen,
     LeftBrace,
     RightBrace,
     Comma,
-    Dot, 
+    Dot,
     Minus,
-    Plus, 
+    Plus,
     Semicolon,
     FSlash,
     Star,

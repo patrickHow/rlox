@@ -1,17 +1,17 @@
-use crate::token::{TokenType, Token};
+use crate::token::{Token, TokenType};
 
 pub struct Scanner {
-    start: usize, // Start of current token
+    start: usize,   // Start of current token
     current: usize, // Current character being examined within token
-    line: u32,  // Current line number
+    line: u32,      // Current line number
 }
 
 // Result<> error values for scanning
 #[derive(Debug)]
 pub struct ScanError {
-    msg: String, 
+    msg: String,
     text: String,
-    line: u32, 
+    line: u32,
 }
 
 impl ScanError {
@@ -30,7 +30,7 @@ impl Scanner {
     }
 
     // Scan and return the next token from the source
-    pub fn scan_token(&mut self, source: & str) -> Result<Token, ScanError> {
+    pub fn scan_token(&mut self, source: &str) -> Result<Token, ScanError> {
         self.skip_whitespace(&source);
         self.start = self.current;
 
@@ -61,7 +61,7 @@ impl Scanner {
                 } else {
                     Ok(self.make_token(&source, TokenType::Bang))
                 }
-            },
+            }
 
             '=' => {
                 if self.match_next(&source, '=') {
@@ -69,7 +69,7 @@ impl Scanner {
                 } else {
                     Ok(self.make_token(&source, TokenType::Equal))
                 }
-            },
+            }
 
             '<' => {
                 if self.match_next(&source, '=') {
@@ -77,7 +77,7 @@ impl Scanner {
                 } else {
                     Ok(self.make_token(&source, TokenType::Less))
                 }
-            },
+            }
 
             '>' => {
                 if self.match_next(&source, '=') {
@@ -85,15 +85,14 @@ impl Scanner {
                 } else {
                     Ok(self.make_token(&source, TokenType::Greater))
                 }
-            },
+            }
             // A double quote should indicate the start of a string literal
             '"' => self.string(&source),
             // Any numeric characters are a number literal
             '0'..='9' => self.number(&source),
 
             // Identifiers must start with a letter or an _
-            'a' ..='z' | 'A' ..='Z' | '_' => self.identifier(&source),
-
+            'a'..='z' | 'A'..='Z' | '_' => self.identifier(&source),
 
             _ => Err(ScanError {
                 msg: "Invalid character".to_string(),
@@ -103,7 +102,7 @@ impl Scanner {
         }
     }
 
-    fn string(&mut self, source: & str) -> Result<Token, ScanError> {
+    fn string(&mut self, source: &str) -> Result<Token, ScanError> {
         // Consume characters until we reach a closing quote
         while self.peek(source).unwrap() != '"' && self.is_at_end(&source) == false {
             // Support newlines within string literals
@@ -118,14 +117,14 @@ impl Scanner {
                 msg: "Unterminated string".to_string(),
                 text: source[self.start..self.current].to_string(),
                 line: self.line,
-            })
+            });
         }
-        // Advance past the final terminating quote 
+        // Advance past the final terminating quote
         self.advance(&source);
-        return Ok(self.make_token(&source, TokenType::String))
+        return Ok(self.make_token(&source, TokenType::String));
     }
 
-    fn number(&mut self, source: & str) -> Result<Token, ScanError> {
+    fn number(&mut self, source: &str) -> Result<Token, ScanError> {
         while self.peek(&source).unwrap().is_digit(10) {
             self.advance(&source);
         }
@@ -134,18 +133,18 @@ impl Scanner {
         if self.peek(&source).unwrap() == '.' && self.peek_next(&source).unwrap().is_digit(10) {
             // Consume the '.'
             self.advance(&source);
-            // Consume the rest of the number 
+            // Consume the rest of the number
             while self.peek(&source).unwrap().is_digit(10) {
                 self.advance(&source);
-            }       
+            }
         }
 
-        return Ok(self.make_token(&source, TokenType::Number))
+        return Ok(self.make_token(&source, TokenType::Number));
     }
 
-    fn identifier(&mut self, source: & str) -> Result<Token, ScanError> {
+    fn identifier(&mut self, source: &str) -> Result<Token, ScanError> {
         // Scan out the rest of the identifier - we allow
-        // numeric characters as well as digits 
+        // numeric characters as well as digits
         while self.peek(&source).unwrap().is_ascii_alphanumeric() {
             self.advance(&source);
         }
@@ -156,7 +155,7 @@ impl Scanner {
     }
 
     // Make a token struct from the current state of the scanner
-    fn make_token(&self, source: & str, token_type: TokenType) -> Token {
+    fn make_token(&self, source: &str, token_type: TokenType) -> Token {
         Token {
             token_type,
             lexeme: source[self.start..self.current].to_string(),
@@ -164,43 +163,43 @@ impl Scanner {
         }
     }
 
-    fn advance(&mut self, source: & str) -> char {
+    fn advance(&mut self, source: &str) -> char {
         self.current += 1;
         source.chars().nth(self.current - 1).unwrap()
     }
 
     // Look at the current character without consuming it
-    fn peek(&self, source: & str) -> Option<char> {
+    fn peek(&self, source: &str) -> Option<char> {
         source.chars().nth(self.current)
     }
 
-    // Look at the NEXT character without consuming it 
-    fn peek_next(&self, source: & str) -> Option<char> {
+    // Look at the NEXT character without consuming it
+    fn peek_next(&self, source: &str) -> Option<char> {
         if self.is_at_end(&source) {
-            return Some('\0')
+            return Some('\0');
         }
         source.chars().nth(self.current + 1)
     }
 
-    fn is_at_end(&self, source: & str) -> bool {
+    fn is_at_end(&self, source: &str) -> bool {
         self.current >= source.len()
     }
 
-    fn match_next(&mut self, source: & str, expected: char) -> bool {
+    fn match_next(&mut self, source: &str, expected: char) -> bool {
         if self.is_at_end(source) {
-            return false
+            return false;
         }
 
         if source.chars().nth(self.current).unwrap() != expected {
-            return false
+            return false;
         }
 
         // We found the matching character
         self.current += 1;
-        return true; 
+        return true;
     }
 
-    fn skip_whitespace(&mut self, source: & str) {
+    fn skip_whitespace(&mut self, source: &str) {
         while let Some(c) = self.peek(&source) {
             match c {
                 ' ' | '\r' | '\t' => {
@@ -213,7 +212,9 @@ impl Scanner {
                 '/' => {
                     // Two '/' in a row indicates a comment line
                     if self.peek_next(source).unwrap() == '/' {
-                        while self.peek(&source).unwrap() != '\n' && self.is_at_end(&source) == false {
+                        while self.peek(&source).unwrap() != '\n'
+                            && self.is_at_end(&source) == false
+                        {
                             self.advance(&source);
                         }
                     } else {
