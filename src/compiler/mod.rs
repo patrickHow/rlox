@@ -241,6 +241,11 @@ impl Compiler {
         self.emit_constant(value, chunk, parser.previous.line);
     }
 
+    fn string(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        let value = Value::String(parser.previous.lexeme.clone());
+        self.emit_constant(value, chunk, parser.previous.line);
+    }
+
     // Recursively compile a grouping within parentheses
     fn grouping(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         self.expression(parser, chunk);
@@ -343,7 +348,7 @@ fn get_rule(token_type: TokenType) -> &'static ParseRule {
         ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // LessEqual
         // Literals
         ParseRule::new(None, None, Precedence::None), // Identifier
-        ParseRule::new(None, None, Precedence::None), // String
+        ParseRule::new(Some(Compiler::string), None, Precedence::None), // String
         ParseRule::new(Some(Compiler::number), None, Precedence::None), // Number
         // Keywords
         ParseRule::new(None, None, Precedence::None), // And

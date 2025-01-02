@@ -99,7 +99,7 @@ impl VM {
                 opcodes::OP_CONSTANT => {
                     let ind = chunk.code[self.ip] as usize;
                     self.ip += 1;
-                    let val = chunk.constants[ind];
+                    let val = chunk.constants[ind].clone();
                     self.stack.push(val);
                 }
                 opcodes::OP_RETURN => {
@@ -109,8 +109,22 @@ impl VM {
                     return InterpretResult::OK;
                 }
                 opcodes::OP_ADD => {
-                    if !self.binary_op(line, add) {
-                        return InterpretResult::RuntimeError;
+                    // Special case for add - string concatenation 
+                    match (self.stack.get(self.stack.len() - 2), self.stack.last()) {
+                        (Some(&Value::Double(a)), Some(&Value::Double(b))) => {
+                            self.stack.truncate(self.stack.len() - 2);
+                            self.stack.push(Value::Double(a + b));
+                        }
+                        (Some(Value::String(a)), Some(Value::String(b))) => {
+                            // Concat first then push - otherwise we try to truncate the vec while a and b are borrowing from it
+                            let concat = Value::String(a.to_owned() + b);
+                            self.stack.truncate(self.stack.len() - 2);
+                            self.stack.push(concat);
+                        }
+                        _ => {
+                            self.runtime_error("Operands must be both numbers or both strings".to_string(), line);
+                            return InterpretResult::RuntimeError;
+                        }
                     }
                 }
                 opcodes::OP_SUBTRACT => {

@@ -1,9 +1,10 @@
 // Enum wrapping the types that a Lox variable can have
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
     Bool(bool),
     Double(f64),
+    String(String),
 }
 
 impl Value {
@@ -12,6 +13,7 @@ impl Value {
             Value::Nil => print!("nil"),
             Value::Bool(v) => print!("{v}"),
             Value::Double(v) => print!("{v}"),
+            Value::String(s) => print!("{s} ({})", s.len()), 
         }
     }
 
@@ -22,6 +24,7 @@ impl Value {
             Value::Nil => true,
             Value::Bool(v) => !v,
             Value::Double(_) => false,
+            Value::String(_) => false,
         }
     }
 }

@@ -87,7 +87,11 @@ impl Scanner {
                 }
             }
             // A double quote should indicate the start of a string literal
-            '"' => self.string(&source),
+            '"' => {
+                // Move the start past the opening quote so it's not part of the string
+                self.start += 1;
+                self.string(&source)
+            }
             // Any numeric characters are a number literal
             '0'..='9' => self.number(&source),
 
@@ -103,6 +107,8 @@ impl Scanner {
     }
 
     fn string(&mut self, source: &str) -> Result<Token, ScanError> {
+        // Advance past the opening " token
+        self.advance(&source);
         // Consume characters until we reach a closing quote
         while self.peek(source).unwrap() != '"' && self.is_at_end(&source) == false {
             // Support newlines within string literals
@@ -119,9 +125,11 @@ impl Scanner {
                 line: self.line,
             });
         }
-        // Advance past the final terminating quote
+
+        let tok = self.make_token(&source, TokenType::String);
+        // Advance past the final terminating quote after making the token to prevent it from being part of the literal
         self.advance(&source);
-        return Ok(self.make_token(&source, TokenType::String));
+        return Ok(tok);
     }
 
     fn number(&mut self, source: &str) -> Result<Token, ScanError> {
