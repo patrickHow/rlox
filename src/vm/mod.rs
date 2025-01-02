@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::chunk;
 use crate::opcodes;
 use crate::value::Value;
@@ -5,17 +7,25 @@ use crate::value::Value;
 const DEFAULT_VM_STACK_SIZE: usize = 256;
 
 // Const functions for doing binary operations
-const fn add(a: f64, b: f64) -> f64 {
-    a + b
+const fn add(a: f64, b: f64) -> Value {
+    Value::Double(a + b)
 }
-const fn sub(a: f64, b: f64) -> f64 {
-    a - b
+const fn sub(a: f64, b: f64) -> Value {
+    Value::Double(a - b)
 }
-const fn mul(a: f64, b: f64) -> f64 {
-    a * b
+const fn mul(a: f64, b: f64) -> Value {
+    Value::Double(a * b)
 }
-const fn div(a: f64, b: f64) -> f64 {
-    a / b
+const fn div(a: f64, b: f64) -> Value {
+    Value::Double(a / b)
+}
+
+const fn greater(a: f64, b: f64) -> Value {
+    Value::Bool(a > b)
+}
+
+const fn less(a: f64, b: f64) -> Value {
+    Value::Bool(a < b)
 }
 
 // TODO this needs to be moved to the interpreter
@@ -24,6 +34,12 @@ pub enum InterpretResult {
     OK,
     CompileError,
     RuntimeError,
+}
+
+// Utility function for value equality
+// Very simple thanks to Rust's PartialEq
+fn values_equal(a: Value, b: Value) -> bool {
+    a == b
 }
 
 pub struct VM {
@@ -44,11 +60,11 @@ impl VM {
         self.stack.clear();
     }
 
-    fn binary_op(&mut self, line: u32, op: fn(f64, f64) -> f64) -> bool {
+    fn binary_op(&mut self, line: u32, op: fn(f64, f64) -> Value) -> bool {
         match (self.stack.get(self.stack.len() - 2), self.stack.last()) {
             (Some(&Value::Double(a)), Some(&Value::Double(b))) => {
                 self.stack.truncate(self.stack.len() - 2);
-                self.stack.push(Value::Double(op(a, b)));
+                self.stack.push(op(a, b));
                 true
             }
             _ => {
@@ -124,6 +140,27 @@ impl VM {
                 opcodes::OP_NIL => self.stack.push(Value::Nil),
                 opcodes::OP_FALSE => self.stack.push(Value::Bool(false)),
                 opcodes::OP_TRUE => self.stack.push(Value::Bool(true)),
+                opcodes::OP_NOT => {
+                    // Logical negate applies to a Value based on its type
+                    // See Value::is_falsey for details
+                    let val = Value::Bool(self.stack.pop().unwrap().is_falsey());
+                    self.stack.push(val)
+                }
+                opcodes::OP_EQUAL => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    self.stack.push(Value::Bool(values_equal(a, b)));
+                }
+                opcodes::OP_GREATER => {
+                    if !self.binary_op(line, greater) {
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                opcodes::OP_LESS => {
+                    if !self.binary_op(line, less) {
+                        return InterpretResult::RuntimeError;
+                    }
+                }
                 _ => return InterpretResult::RuntimeError,
             }
         }

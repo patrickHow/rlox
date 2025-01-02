@@ -260,7 +260,11 @@ impl Compiler {
         // Emit the instruction - will need to be extended for new unary ops
         // Note when we compile an expression like "!val" we need to put val on the stack FIRST
         // hence the call to expression() before we emit the OP_NEGATE
-        self.emit_byte(opcodes::OP_NEGATE, chunk, parser.previous.line);
+        match tok_type {
+            TokenType::Bang => self.emit_byte(opcodes::OP_NOT, chunk, parser.previous.line),
+            TokenType::Minus => self.emit_byte(opcodes::OP_NEGATE, chunk, parser.previous.line),
+            _ => panic!("Invalid unary op type"),
+        }
     }
 
     fn binary(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
@@ -275,6 +279,27 @@ impl Compiler {
             TokenType::Minus => self.emit_byte(opcodes::OP_SUBTRACT, chunk, parser.previous.line),
             TokenType::Star => self.emit_byte(opcodes::OP_MULTIPLY, chunk, parser.previous.line),
             TokenType::FSlash => self.emit_byte(opcodes::OP_DIVIDE, chunk, parser.previous.line),
+            TokenType::BangEqual => self.emit_bytes(
+                opcodes::OP_EQUAL,
+                opcodes::OP_NOT,
+                chunk,
+                parser.previous.line,
+            ),
+            TokenType::EqualEqual => self.emit_byte(opcodes::OP_EQUAL, chunk, parser.previous.line),
+            TokenType::Greater => self.emit_byte(opcodes::OP_GREATER, chunk, parser.previous.line),
+            TokenType::GreaterEqual => self.emit_bytes(
+                opcodes::OP_LESS,
+                opcodes::OP_NOT,
+                chunk,
+                parser.previous.line,
+            ),
+            TokenType::Less => self.emit_byte(opcodes::OP_LESS, chunk, parser.previous.line),
+            TokenType::LessEqual => self.emit_bytes(
+                opcodes::OP_GREATER,
+                opcodes::OP_NOT,
+                chunk,
+                parser.previous.line,
+            ),
             _ => panic!("Invalid binary op type"),
         }
     }
@@ -291,6 +316,9 @@ impl Compiler {
 
 fn get_rule(token_type: TokenType) -> &'static ParseRule {
     // Static array is initialized at compile time
+    // DO NOT REORDER
+    // This is intended to be indexed by TokenType so it needs to line up
+    #[rustfmt::skip]
     static RULES: [ParseRule; TOKEN_COUNT] = [
         // Single-character tokens
         ParseRule::new(Some(Compiler::grouping), None, Precedence::None), // LeftParen
@@ -299,24 +327,20 @@ fn get_rule(token_type: TokenType) -> &'static ParseRule {
         ParseRule::new(None, None, Precedence::None),                     // RightBrace
         ParseRule::new(None, None, Precedence::None),                     // Comma
         ParseRule::new(None, None, Precedence::None),                     // Dot
-        ParseRule::new(
-            Some(Compiler::unary),
-            Some(Compiler::binary),
-            Precedence::Term,
-        ), // Minus
+        ParseRule::new(Some(Compiler::unary),Some(Compiler::binary), Precedence::Term), // Minus
         ParseRule::new(None, Some(Compiler::binary), Precedence::Term),   // Plus
         ParseRule::new(None, None, Precedence::None),                     // Semicolon
         ParseRule::new(None, Some(Compiler::binary), Precedence::Factor), // FSlash
         ParseRule::new(None, Some(Compiler::binary), Precedence::Factor), // Star
         // One or two character tokens
-        ParseRule::new(None, None, Precedence::None), // Bang
-        ParseRule::new(None, None, Precedence::None), // BangEqual
-        ParseRule::new(None, None, Precedence::None), // Equal
-        ParseRule::new(None, None, Precedence::None), // EqualEqual
-        ParseRule::new(None, None, Precedence::None), // Greater
-        ParseRule::new(None, None, Precedence::None), // GreaterEqual
-        ParseRule::new(None, None, Precedence::None), // Less
-        ParseRule::new(None, None, Precedence::None), // LessEqual
+        ParseRule::new(Some(Compiler::unary), None, Precedence::None), // Bang
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Equality), // BangEqual
+        ParseRule::new(None, None, Precedence::None),                  // Equal
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Equality), // EqualEqual
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // Greater
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // GreaterEqual
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // Less
+        ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // LessEqual
         // Literals
         ParseRule::new(None, None, Precedence::None), // Identifier
         ParseRule::new(None, None, Precedence::None), // String

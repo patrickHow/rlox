@@ -1,5 +1,5 @@
 // Enum wrapping the types that a Lox variable can have
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Value {
     Nil,
     Bool(bool),
@@ -12,6 +12,16 @@ impl Value {
             Value::Nil => print!("nil"),
             Value::Bool(v) => print!("{v}"),
             Value::Double(v) => print!("{v}"),
+        }
+    }
+
+    // Return the "falsiness" of the value
+    // Yes, I dislike this owrd as well
+    pub fn is_falsey(&self) -> bool {
+        match self {
+            Value::Nil => true,
+            Value::Bool(v) => !v,
+            Value::Double(_) => false,
         }
     }
 }

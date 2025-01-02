@@ -60,6 +60,10 @@ impl Chunk {
             opcodes::OP_NIL => simple_instruction("OP_NIL".to_string(), offset),
             opcodes::OP_FALSE => simple_instruction("OP_FALSE".to_string(), offset),
             opcodes::OP_TRUE => simple_instruction("OP_TRUE".to_string(), offset),
+            opcodes::OP_NOT => simple_instruction("OP_NOT".to_string(), offset),
+            opcodes::OP_EQUAL => simple_instruction("OP_EQUAL".to_string(), offset),
+            opcodes::OP_GREATER => simple_instruction("OP_GREATER".to_string(), offset),
+            opcodes::OP_LESS => simple_instruction("OP_LESS".to_string(), offset),
             _ => {
                 println!("Invalid opcode {instruction}");
                 offset + 1 // Advance past the bad instruction
