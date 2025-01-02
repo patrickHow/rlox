@@ -121,6 +121,9 @@ impl VM {
                         return InterpretResult::RuntimeError;
                     }
                 },
+                opcodes::OP_NIL => self.stack.push(Value::Nil),
+                opcodes::OP_FALSE => self.stack.push(Value::Bool(false)),
+                opcodes::OP_TRUE => self.stack.push(Value::Bool(true)),
                 _ => return InterpretResult::RuntimeError,
             }
         }

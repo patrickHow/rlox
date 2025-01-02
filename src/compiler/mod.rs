@@ -278,6 +278,15 @@ impl Compiler {
             _ => panic!("Invalid binary op type"),
         }
     }
+
+    fn literal(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        match parser.previous.token_type {
+            TokenType::Nil => self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line),
+            TokenType::False => self.emit_byte(opcodes::OP_FALSE, chunk, parser.previous.line),
+            TokenType::True => self.emit_byte(opcodes::OP_TRUE, chunk, parser.previous.line),
+            _ => panic!("Invalid literal op type"),
+        }
+    }
 }
 
 fn get_rule(token_type: TokenType) -> &'static ParseRule {
@@ -316,17 +325,17 @@ fn get_rule(token_type: TokenType) -> &'static ParseRule {
         ParseRule::new(None, None, Precedence::None), // And
         ParseRule::new(None, None, Precedence::None), // Class
         ParseRule::new(None, None, Precedence::None), // Else
-        ParseRule::new(None, None, Precedence::None), // False
+        ParseRule::new(Some(Compiler::literal), None, Precedence::None), // False
         ParseRule::new(None, None, Precedence::None), // For
         ParseRule::new(None, None, Precedence::None), // Fun
         ParseRule::new(None, None, Precedence::None), // If
-        ParseRule::new(None, None, Precedence::None), // Nil
+        ParseRule::new(Some(Compiler::literal), None, Precedence::None), // Nil
         ParseRule::new(None, None, Precedence::None), // Or
         ParseRule::new(None, None, Precedence::None), // Print
         ParseRule::new(None, None, Precedence::None), // Return
         ParseRule::new(None, None, Precedence::None), // Super
         ParseRule::new(None, None, Precedence::None), // This
-        ParseRule::new(None, None, Precedence::None), // True
+        ParseRule::new(Some(Compiler::literal), None, Precedence::None), // True
         ParseRule::new(None, None, Precedence::None), // Var
         ParseRule::new(None, None, Precedence::None), // While
         // Special tokens

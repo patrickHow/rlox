@@ -56,8 +56,10 @@ impl Chunk {
             opcodes::OP_SUBTRACT => simple_instruction("OP_SUBTRACT".to_string(), offset),
             opcodes::OP_MULTIPLY => simple_instruction("OP_MULTIPLY".to_string(), offset),
             opcodes::OP_DIVIDE => simple_instruction("OP_DIVIDE".to_string(), offset),
-
             opcodes::OP_NEGATE => simple_instruction("OP_NEGATE".to_string(), offset),
+            opcodes::OP_NIL => simple_instruction("OP_NIL".to_string(), offset),
+            opcodes::OP_FALSE => simple_instruction("OP_FALSE".to_string(), offset),
+            opcodes::OP_TRUE => simple_instruction("OP_TRUE".to_string(), offset),
             _ => {
                 println!("Invalid opcode {instruction}");
                 offset + 1 // Advance past the bad instruction
