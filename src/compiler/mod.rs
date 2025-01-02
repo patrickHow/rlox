@@ -1,7 +1,7 @@
 use crate::chunk::Chunk;
 use crate::opcodes::{self};
 use crate::scanner::Scanner;
-use crate::token::{Token, TokenType, TOKEN_COUNT};
+use crate::token::{self, Token, TokenType, TOKEN_COUNT};
 use crate::value::Value;
 use core::panic;
 use std::ops::Add;
@@ -114,6 +114,15 @@ impl Parser {
         }
     }
 
+    fn match_and_advance(&mut self, token_type: TokenType) -> bool {
+        if token_type == self.current.token_type {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
     fn error_on_prev(&mut self, msg: String) {
         if self.panic_mode {
             return;
@@ -152,8 +161,11 @@ impl Compiler {
 
         // Advance the parser to the first token
         parser.advance();
-        self.expression(&mut parser, &mut chunk);
-        parser.consume(TokenType::Eof, "Expected end of expression".to_string());
+        
+        // Continuously compile declarations until the end of file is reached 
+        while !parser.match_and_advance(TokenType::Eof) {
+            self.declaration(&mut parser, &mut chunk);
+        }
 
         self.end(&mut chunk, parser.previous.line);
         if parser.has_error {
@@ -164,6 +176,7 @@ impl Compiler {
     }
 
     // Core function for compiling expressions - can be called recursively
+    // An expression is a bit of Lox that produces a value - 1 + 2
     fn expression(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
         self.expression_depth += 1;
         if self.expression_depth > MAX_EXPRESSION_NESTING {
@@ -173,6 +186,40 @@ impl Compiler {
         self.parse_precedence(parser, chunk, Precedence::Assignment);
 
         self.expression_depth -= 1;
+    }
+
+    // Core function for compiling declarations 
+    // A Lox program is a sequence of declarations:
+    // declaration -> | class declaration
+    //                | function declaration
+    //                | variable declaration
+    //                | statement
+    fn declaration(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
+        // For now, we simply forward to statement()
+        self.statement(parser, chunk);
+
+        if parser.panic_mode {
+            self.synchronize(parser);
+        }
+    }
+
+    // Core function for compiling statements
+    // A statement produces an effect and don't evaluate to a value
+    // They can modify state, read input, produce output, etc
+    // statement | exprStmt
+    //           | forStmt
+    //           | ifStmt
+    //           | printStmt
+    //           | returnStmt
+    //           | whileStmt
+    //           | block 
+    fn statement(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
+        // TODO do we need to use a match statement with an advance() at the end?
+        if parser.match_and_advance(TokenType::Print) {
+            self.print_statement(chunk, parser);
+        } else {
+            self.expression_statement(chunk, parser);
+        }
     }
 
     // Starts at current token and parses any expression at the given precedence or higher
@@ -207,6 +254,34 @@ impl Compiler {
                 }
             }
         }
+    }
+
+    // If an error is encountered while parsing, this function advances to the next statement boundary
+    fn synchronize(&mut self, parser: &mut Parser) {
+        parser.panic_mode = false;
+
+        while parser.current.token_type != TokenType::Eof {
+            if parser.previous.token_type == TokenType::Semicolon {
+                return
+            }
+
+            // Look for a statement boundary - any of these tokens can begin a new statement
+            match parser.current.token_type {
+                TokenType::Class => return,
+                TokenType::Fun => return, 
+                TokenType::Var => return,
+                TokenType::For => return, 
+                TokenType::If => return, 
+                TokenType::While => return, 
+                TokenType::Print => return,
+                TokenType::Return => return,   
+
+                _ => {} // Do nothing
+            }
+
+            parser.advance();
+        }
+
     }
 
     fn emit_byte(&self, byte: u8, chunk: &mut Chunk, line: u32) {
@@ -316,6 +391,21 @@ impl Compiler {
             TokenType::True => self.emit_byte(opcodes::OP_TRUE, chunk, parser.previous.line),
             _ => panic!("Invalid literal op type"),
         }
+    }
+
+    // Evaluate an expression and print the result
+    fn print_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        // Parse and compile the expression, then consume the semicolon
+        self.expression(parser, chunk);
+        parser.consume(TokenType::Semicolon, "Expected ';' after value".to_string());
+        self.emit_byte(opcodes::OP_PRINT, chunk, parser.previous.line);
+    }
+
+    fn expression_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        // Parse an expression until the semicolon
+        self.expression(parser, chunk);
+        parser.consume(TokenType::Semicolon, "Expected ';' after expression".to_string());
+        self.emit_byte(opcodes::OP_POP , chunk, parser.previous.line);
     }
 }
 

@@ -12,3 +12,5 @@ pub const OP_NOT: u8 = 10; // [opcode] - applies logical not to the value at the
 pub const OP_EQUAL: u8 = 11; // [opcode] - checks the equality of the last two values on the stack
 pub const OP_GREATER: u8 = 12; // [opcode] - checks if the second-from-last value on the stack is greater than the last value on the stack
 pub const OP_LESS: u8 = 13; // [opcode] - checks if the second-from-last value on the stack is less than the last value on the stack
+pub const OP_PRINT: u8 = 14; // [opcode] - prints the last value on the stack
+pub const OP_POP: u8 = 15; // [opcode] - discard the last item on the stack

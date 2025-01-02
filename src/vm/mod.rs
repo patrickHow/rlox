@@ -103,9 +103,7 @@ impl VM {
                     self.stack.push(val);
                 }
                 opcodes::OP_RETURN => {
-                    let val = self.stack.pop().unwrap();
-                    val.print();
-                    println!();
+                    // Exit VM
                     return InterpretResult::OK;
                 }
                 opcodes::OP_ADD => {
@@ -174,6 +172,15 @@ impl VM {
                     if !self.binary_op(line, less) {
                         return InterpretResult::RuntimeError;
                     }
+                }
+                opcodes::OP_PRINT => {
+                    let value = self.stack.pop().unwrap();
+                    value.print();
+                    println!();
+                }
+                opcodes::OP_POP => {
+                    // TODO should we throw an error if this gets inserted and pops nothing?
+                    self.stack.pop();
                 }
                 _ => return InterpretResult::RuntimeError,
             }
