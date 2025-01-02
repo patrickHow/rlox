@@ -1,5 +1,4 @@
-use std::any::Any;
-
+use std::collections::HashMap;
 use crate::chunk;
 use crate::opcodes;
 use crate::value::Value;
@@ -45,6 +44,7 @@ fn values_equal(a: Value, b: Value) -> bool {
 pub struct VM {
     ip: usize,         // Instruction pointer - an index into the code array in the vector
     stack: Vec<Value>, // A stack for values in the VM
+    globals: HashMap<String, Value>, // Hash table for global variable storage
 }
 
 impl VM {
@@ -52,6 +52,7 @@ impl VM {
         Self {
             ip: 0,
             stack: Vec::with_capacity(DEFAULT_VM_STACK_SIZE),
+            globals: HashMap::new()
         }
     }
 
@@ -181,6 +182,18 @@ impl VM {
                 opcodes::OP_POP => {
                     // TODO should we throw an error if this gets inserted and pops nothing?
                     self.stack.pop();
+                }
+                opcodes::OP_DEFINE_GLOBAL => {
+                    // The ip has advanced to the index
+                    let ind = chunk.code[self.ip] as usize;
+                    self.ip += 1;
+                    let val = chunk.constants[ind].clone();
+                    if let Value::String(key) = &chunk.constants[ind] {
+                        self.globals.insert(key.to_owned(), val);
+                        self.stack.pop();
+                    } else {
+                        self.runtime_error("Non-string value for variable name".to_string(), line);
+                    }
                 }
                 _ => return InterpretResult::RuntimeError,
             }

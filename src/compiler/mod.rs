@@ -195,9 +195,14 @@ impl Compiler {
     //                | variable declaration
     //                | statement
     fn declaration(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
-        // For now, we simply forward to statement()
-        self.statement(parser, chunk);
+        
+        if parser.match_and_advance(TokenType::Var) {
+            self.var_declaration(chunk, parser);
+        } else {
+            self.statement(parser, chunk);
+        }
 
+        // Recover from an error by advancing to the next statement boundary
         if parser.panic_mode {
             self.synchronize(parser);
         }
@@ -407,6 +412,29 @@ impl Compiler {
         parser.consume(TokenType::Semicolon, "Expected ';' after expression".to_string());
         self.emit_byte(opcodes::OP_POP , chunk, parser.previous.line);
     }
+
+    fn parse_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) -> u8 {
+        parser.consume(TokenType::Identifier, "Expected variable name".to_string());
+        return chunk.add_constant(Value::String(parser.current.lexeme.clone()));
+    }
+
+    fn define_variable(&mut self, global: u8, chunk: &mut Chunk, line: u32) {
+        self.emit_bytes(opcodes::OP_DEFINE_GLOBAL, global, chunk, line);
+    }
+
+    fn var_declaration(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        let global = self.parse_variable(chunk, parser);
+
+        if parser.match_and_advance(TokenType::Equal) {
+            self.expression(parser, chunk);
+        } else {
+            // TODO double check the line here
+            self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line);
+        }
+        
+        self.define_variable(global, chunk, parser.previous.line);
+    }
+
 }
 
 fn get_rule(token_type: TokenType) -> &'static ParseRule {

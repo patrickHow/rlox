@@ -14,3 +14,4 @@ pub const OP_GREATER: u8 = 12; // [opcode] - checks if the second-from-last valu
 pub const OP_LESS: u8 = 13; // [opcode] - checks if the second-from-last value on the stack is less than the last value on the stack
 pub const OP_PRINT: u8 = 14; // [opcode] - prints the last value on the stack
 pub const OP_POP: u8 = 15; // [opcode] - discard the last item on the stack
+pub const OP_DEFINE_GLOBAL: u8 = 16; // [opcode][ind] - add a variable to the VM's global variable table. The name is at [ind] in the chunk constant table, the value is on the stack
