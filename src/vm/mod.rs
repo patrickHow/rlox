@@ -1,5 +1,6 @@
 use crate::chunk;
 use crate::opcodes;
+use crate::value::Value;
 
 const DEFAULT_VM_STACK_SIZE: usize = 256;
 
@@ -19,7 +20,7 @@ pub enum InterpretResult {
 
 pub struct VM {
     ip: usize, // Instruction pointer - an index into the code array in the vector
-    stack: Vec<f64>, // A stack for values in the VM 
+    stack: Vec<Value>, // A stack for values in the VM 
 }
 
 impl VM {
@@ -35,10 +36,18 @@ impl VM {
         self.stack.clear();
     }
 
-    fn binary_op(&mut self, op: fn(f64, f64) -> f64) {
-        let b = self.stack.pop().unwrap();
-        let a = self.stack.pop().unwrap();
-        self.stack.push(op(a, b));
+    fn binary_op(&mut self, line: u32, op: fn(f64, f64) -> f64) -> bool {
+        match (self.stack.get(self.stack.len() - 2), self.stack.last()) {
+            (Some(&Value::Double(a)), Some(&Value::Double(b))) => {
+                self.stack.truncate(self.stack.len() - 2);
+                self.stack.push(Value::Double(op(a, b)));
+                true
+            }
+            _ => {
+                self.runtime_error("Operands must be numbers".to_string(), line);
+                false
+            }
+        }
     }
 
     pub fn run(&mut self, chunk: chunk::Chunk) -> InterpretResult {
@@ -49,7 +58,10 @@ impl VM {
             if cfg!(debug_assertions) {
                 // Dump the stack trace
                 for val in &self.stack {
-                    print!("[{val}]");
+                    print!("[");
+                    val.print();
+                    print!("]");
+
                 }
                 println!();
 
@@ -57,6 +69,8 @@ impl VM {
                 chunk.disassemble_instruction(self.ip);
             }
             let instruction = chunk.code[self.ip];
+            // Line number is useful to have around for reporting errors
+            let line = chunk.lines[self.ip];
             self.ip += 1;
 
             match instruction {
@@ -68,19 +82,47 @@ impl VM {
                 }
                 opcodes::OP_RETURN => {
                     let val = self.stack.pop().unwrap();
-                    println!("{val}");
+                    val.print();
+                    println!();
                     return InterpretResult::OK
                 }
-                opcodes::OP_ADD => self.binary_op(add),
-                opcodes::OP_SUBTRACT => self.binary_op(sub),
-                opcodes::OP_MULTIPLY => self.binary_op(mul),
-                opcodes::OP_DIVIDE => self.binary_op(div),
+                opcodes::OP_ADD => {
+                    if !self.binary_op(line,add) {
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                opcodes::OP_SUBTRACT => {
+                    if !self.binary_op(line,sub) {
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                opcodes::OP_MULTIPLY => {
+                    if !self.binary_op(line,mul) {
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+                opcodes::OP_DIVIDE => {
+                    if !self.binary_op(line,div) {
+                        return InterpretResult::RuntimeError;
+                    }
+                }
                 opcodes::OP_NEGATE => {
-                    let top_idx = self.stack.len() - 1;
-                    self.stack[top_idx] = -self.stack[top_idx];
+                    match self.stack.last().unwrap() {
+                        Value::Double(v) => {
+                            *self.stack.last_mut().unwrap() = Value::Double(-v);
+                        }
+                        _ => {
+                            self.runtime_error("Operand must be a number".to_string(), line);
+                        return InterpretResult::RuntimeError;
+                        }
+                    }
                 }
                 _ => return InterpretResult::RuntimeError,
             }
         }
+    }
+
+    fn runtime_error(&mut self, msg: String, line: u32) {
+        println!("[line {line}]: runtime error: {msg}");
     }
 }

@@ -1,6 +1,7 @@
 use crate::chunk::Chunk;
 use crate::opcodes::{self};
 use crate::scanner::Scanner;
+use crate::value::Value;
 use crate::token::{Token, TokenType, TOKEN_COUNT};
 use core::panic;
 use std::ops::Add;
@@ -108,7 +109,6 @@ impl Parser {
         }
     }
 
-
     fn error_on_prev(&mut self, msg: String) {
         if self.panic_mode {
             return
@@ -146,6 +146,7 @@ impl Compiler {
         let mut parser = Parser::new(source);
         let mut chunk = Chunk::new();
 
+        // Advance the parser to the first token
         parser.advance();
         self.expression(&mut parser, &mut chunk);
         parser.consume(TokenType::Eof, "Expected end of expression".to_string());
@@ -223,7 +224,7 @@ impl Compiler {
         self.emit_byte(opcodes::OP_RETURN, chunk, line);
     }
 
-    fn emit_constant(&self, value: f64, chunk: &mut Chunk, line: u32) {
+    fn emit_constant(&self, value: Value, chunk: &mut Chunk, line: u32) {
         let ind = chunk.add_constant(value);
         if ind > u8::MAX {
             panic!("Error, too many constants in one chunk");
@@ -237,7 +238,7 @@ impl Compiler {
     // Compiles a number literal
     // Assumes the token in previous contains the literal
     fn number(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
-        let value: f64 = parser.previous.lexeme.parse().unwrap(); // TODO add a better error
+        let value = Value::Double(parser.previous.lexeme.parse().unwrap()); // TODO add a better error
         self.emit_constant(value, chunk, parser.previous.line);
     }
 

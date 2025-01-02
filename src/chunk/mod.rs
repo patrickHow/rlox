@@ -1,11 +1,12 @@
 use crate::opcodes;
+use crate::value::Value;
 
 const DEFAULT_CHUNK_LEN: usize = 16;
 
 pub struct Chunk {
     pub code: Vec<u8>,
     pub lines: Vec<u32>,
-    pub constants: Vec<f64>,
+    pub constants: Vec<Value>,
 }
 
 fn simple_instruction(name: String, offset: usize) -> usize {
@@ -70,8 +71,10 @@ impl Chunk {
         // Second byte of the instruction will the index of the constant
         // in the chunk's constant array 
         let ind = self.code[offset + 1] as usize;
-        let value = self.constants[ind];
-        println!("{name} {value}");
+        let value = &self.constants[ind];
+        print!("{name}: ");
+        value.print();
+        println!();
         return offset + 2;
     }
 
@@ -83,7 +86,7 @@ impl Chunk {
 
     // Write a constant value to the chunk
     // Returns the index of the added value for later use
-    pub fn add_constant(&mut self, value: f64) -> u8 {
+    pub fn add_constant(&mut self, value: Value) -> u8 {
         self.constants.push(value);
         return (self.constants.len() - 1) as u8
     }

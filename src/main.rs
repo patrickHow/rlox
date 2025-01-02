@@ -8,6 +8,7 @@ mod scanner;
 mod compiler;
 mod opcodes;
 mod token;
+mod value;
 
 
 // Top-level struct to tie our pipeline together
