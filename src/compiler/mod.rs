@@ -431,6 +431,8 @@ impl Compiler {
             // TODO double check the line here
             self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line);
         }
+
+        parser.consume(TokenType::Semicolon, "Expected ';' after variable declaration".to_string());
         
         self.define_variable(global, chunk, parser.previous.line);
     }
