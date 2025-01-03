@@ -241,6 +241,7 @@ impl Compiler {
                 return;
             }
             Some(parse_fn) => {
+                println!("Parsing token {:?}", parser.current.token_type);
                 parse_fn(self, chunk, parser);
             }
         }
@@ -398,6 +399,17 @@ impl Compiler {
         }
     }
 
+    fn variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        println!("Variable hook");
+        self.named_variable(chunk, parser);
+    }
+
+    fn named_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        println!("Requesting global var: {}", parser.previous.lexeme);
+        let arg = chunk.add_constant(Value::String(parser.previous.lexeme.clone()));
+        self.emit_bytes(opcodes::OP_GET_GLOBAL, arg, chunk, parser.previous.line);
+    }
+
     // Evaluate an expression and print the result
     fn print_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         // Parse and compile the expression, then consume the semicolon
@@ -415,7 +427,7 @@ impl Compiler {
 
     fn parse_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) -> u8 {
         parser.consume(TokenType::Identifier, "Expected variable name".to_string());
-        return chunk.add_constant(Value::String(parser.current.lexeme.clone()));
+        return chunk.add_constant(Value::String(parser.previous.lexeme.clone()));
     }
 
     fn define_variable(&mut self, global: u8, chunk: &mut Chunk, line: u32) {
@@ -467,7 +479,7 @@ fn get_rule(token_type: TokenType) -> &'static ParseRule {
         ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // Less
         ParseRule::new(None, Some(Compiler::binary), Precedence::Comparison), // LessEqual
         // Literals
-        ParseRule::new(None, None, Precedence::None), // Identifier
+        ParseRule::new(Some(Compiler::variable), None, Precedence::None), // Identifier
         ParseRule::new(Some(Compiler::string), None, Precedence::None), // String
         ParseRule::new(Some(Compiler::number), None, Precedence::None), // Number
         // Keywords

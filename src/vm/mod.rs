@@ -184,16 +184,32 @@ impl VM {
                     self.stack.pop();
                 }
                 opcodes::OP_DEFINE_GLOBAL => {
-                    // The ip has advanced to the index
                     let ind = chunk.code[self.ip] as usize;
                     self.ip += 1;
-                    let val = chunk.constants[ind].clone();
+                    // The value itself will be on the stack
+                    let val = self.stack.pop().unwrap();
                     if let Value::String(key) = &chunk.constants[ind] {
+                        println!("VM adding variable: {}: {:?}", key, val);
                         self.globals.insert(key.to_owned(), val);
                         self.stack.pop();
                     } else {
                         self.runtime_error("Non-string value for variable name".to_string(), line);
                     }
+                }
+                opcodes::OP_GET_GLOBAL => {
+                    let ind = chunk.code[self.ip] as usize;
+                    self.ip += 1;
+                    if let Value::String(name) = &chunk.constants[ind] {
+                        if let Some(value) = self.globals.get(name) {
+                            println!("VM retrieving variable: {}: {:?}", name, value);
+                            self.stack.push(value.clone());
+                        } else {
+                            self.runtime_error(format!("Undefined variable: {}", name), line);
+                        }
+                    } else {
+                        self.runtime_error("Non-string constant fetched for variable name".to_string(), line);
+                    }
+
                 }
                 _ => return InterpretResult::RuntimeError,
             }
