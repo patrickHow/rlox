@@ -214,6 +214,23 @@ impl VM {
                         );
                     }
                 }
+                opcodes::OP_SET_GLOBAL => {
+                    let ind = chunk.code[self.ip] as usize;
+                    self.ip += 1;
+                    // Pop the new value
+                    let val = self.stack.pop().unwrap();
+                    if let Value::String(key) = &chunk.constants[ind] {
+                        // Valid variable name, does it exist?
+                        match self.globals.get_mut(key) {
+                            None => {
+                                self.runtime_error(format!("Undefined variable {}", key), line);
+                            }
+                            Some(v) => *v = val.clone(),
+                        }
+                    } else {
+                        self.runtime_error("Non-string value for variable name".to_string(), line);
+                    }
+                }
                 _ => return InterpretResult::RuntimeError,
             }
         }

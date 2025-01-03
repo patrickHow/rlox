@@ -38,15 +38,15 @@ impl Add<u8> for Precedence {
 }
 
 struct ParseRule {
-    prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
-    infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
+    prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser, bool)>,
+    infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser, bool)>,
     precedence: Precedence,
 }
 
 impl ParseRule {
     const fn new(
-        prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
-        infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser)>,
+        prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser, bool)>,
+        infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser, bool)>,
         precedence: Precedence,
     ) -> Self {
         Self {
@@ -230,17 +230,20 @@ impl Compiler {
     fn parse_precedence(&mut self, parser: &mut Parser, chunk: &mut Chunk, precedence: Precedence) {
         // Read the next token and get the parse rule
         parser.advance();
+
+        let can_assign = precedence <= Precedence::Assignment;
+
         let rule = get_rule(parser.previous.token_type);
 
         // Since this is the first token, not having a prefix rule should throw a syntax error
         // Otherwise, call the function to parse the token
         match rule.prefix {
             None => {
-                parser.previous.error("Expected expression".to_string());
+                parser.error_on_prev("Expected expression".to_string());
                 return;
             }
             Some(parse_fn) => {
-                parse_fn(self, chunk, parser);
+                parse_fn(self, chunk, parser, can_assign);
             }
         }
 
@@ -250,12 +253,18 @@ impl Compiler {
             let infix_rule = get_rule(parser.previous.token_type);
             match infix_rule.infix {
                 None => {
-                    parser.previous.error("No rule to parse token".to_string());
+                    parser.error_on_prev("No rule to parse token".to_string());
                     return;
                 }
                 Some(parse_fn) => {
-                    parse_fn(self, chunk, parser);
+                    parse_fn(self, chunk, parser, can_assign);
                 }
+            }
+
+            // Catch the case where the lhs of an = is not a valid assignment
+            // i.e. some expression like a*b = c+d;
+            if can_assign && parser.match_and_advance(TokenType::Equal) {
+                parser.error_on_prev("Invalid assignment target".to_string());
             }
         }
     }
@@ -314,18 +323,18 @@ impl Compiler {
 
     // Compiles a number literal
     // Assumes the token in previous contains the literal
-    fn number(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn number(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         let value = Value::Double(parser.previous.lexeme.parse().unwrap()); // TODO add a better error
         self.emit_constant(value, chunk, parser.previous.line);
     }
 
-    fn string(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn string(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         let value = Value::String(parser.previous.lexeme.clone());
         self.emit_constant(value, chunk, parser.previous.line);
     }
 
     // Recursively compile a grouping within parentheses
-    fn grouping(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn grouping(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         self.expression(parser, chunk);
         parser.consume(
             TokenType::RightParen,
@@ -334,7 +343,7 @@ impl Compiler {
     }
 
     // Compiles a unary operation, such as negation
-    fn unary(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn unary(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         let tok_type = parser.previous.token_type;
 
         // Compile the expression
@@ -350,7 +359,7 @@ impl Compiler {
         }
     }
 
-    fn binary(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn binary(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         let op_type = parser.previous.token_type;
         let rule = get_rule(op_type);
         // Parse everything to the right of the token with precedence higher than the current op
@@ -387,7 +396,7 @@ impl Compiler {
         }
     }
 
-    fn literal(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn literal(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         match parser.previous.token_type {
             TokenType::Nil => self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line),
             TokenType::False => self.emit_byte(opcodes::OP_FALSE, chunk, parser.previous.line),
@@ -396,13 +405,19 @@ impl Compiler {
         }
     }
 
-    fn variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
-        self.named_variable(chunk, parser);
+    fn variable(&mut self, chunk: &mut Chunk, parser: &mut Parser, can_assign: bool) {
+        self.named_variable(chunk, parser, can_assign);
     }
 
-    fn named_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+    fn named_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser, can_assign: bool) {
         let arg = chunk.add_constant(Value::String(parser.previous.lexeme.clone()));
-        self.emit_bytes(opcodes::OP_GET_GLOBAL, arg, chunk, parser.previous.line);
+
+        if can_assign && parser.match_and_advance(TokenType::Equal) {
+            self.expression(parser, chunk);
+            self.emit_bytes(opcodes::OP_SET_GLOBAL, arg, chunk, parser.previous.line);
+        } else {
+            self.emit_bytes(opcodes::OP_GET_GLOBAL, arg, chunk, parser.previous.line);
+        }
     }
 
     // Evaluate an expression and print the result

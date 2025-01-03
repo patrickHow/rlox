@@ -72,6 +72,9 @@ impl Chunk {
             opcodes::OP_GET_GLOBAL => {
                 self.constant_instruction("OP_GET_GLOBAL".to_string(), offset)
             }
+            opcodes::OP_SET_GLOBAL => {
+                self.constant_instruction("OP_SET_GLOBAL".to_string(), offset)
+            }
 
             _ => {
                 println!("Invalid opcode {instruction}");

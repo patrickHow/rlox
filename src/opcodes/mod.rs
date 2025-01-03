@@ -16,3 +16,4 @@ pub const OP_PRINT: u8 = 14; // [opcode] - prints the last value on the stack
 pub const OP_POP: u8 = 15; // [opcode] - discard the last item on the stack
 pub const OP_DEFINE_GLOBAL: u8 = 16; // [opcode][ind] - add a variable to the VM's global variable table. The name is at [ind] in the chunk constant table, the value is on the stack
 pub const OP_GET_GLOBAL: u8 = 17; // [opcode][ind] - load the value in the variable whose name is stored at the index in the constant table
+pub const OP_SET_GLOBAL: u8 = 18; // [opcode][ind] - set the value in the variable whose name is stored at the index in the constant table to the value on the stack
