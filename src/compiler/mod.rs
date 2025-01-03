@@ -1,7 +1,7 @@
 use crate::chunk::Chunk;
 use crate::opcodes::{self};
 use crate::scanner::Scanner;
-use crate::token::{self, Token, TokenType, TOKEN_COUNT};
+use crate::token::{Token, TokenType, TOKEN_COUNT};
 use crate::value::Value;
 use core::panic;
 use std::ops::Add;
@@ -486,13 +486,14 @@ impl Compiler {
 
     // Find a local variable by token name in the locals vec
     fn resolve_local(&self, parser: &mut Parser) -> Option<u8> {
-        for (i, local) in self.locals.iter().rev().enumerate() {
+        for (i, local) in self.locals.iter().enumerate().rev() {
             if local.name.lexeme == parser.previous.lexeme {
                 if local.depth == -1 {
                     parser.error_on_prev(
                         "Cannot read local variable in its own initalizer".to_string(),
                     );
                 }
+                println!("Resolved local {} at {}", local.name.lexeme, i);
                 return Some(i as u8);
             }
         }
@@ -529,6 +530,7 @@ impl Compiler {
             }
         }
 
+        println!("Adding new local named {}", new_local.name.lexeme);
         self.locals.push(new_local);
     }
 
@@ -576,6 +578,7 @@ impl Compiler {
         // i.e. var a; -> a == nil
         if parser.match_and_advance(TokenType::Equal) {
             self.expression(parser, chunk);
+            println!("Defining variable with lexeme: {}", parser.previous.lexeme);
         } else {
             self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line);
         }

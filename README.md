@@ -7,7 +7,7 @@ rlox is, therefore, a bytecode virtual machine, scanner, and compiler. rlox is s
 This project is primarily for my own learning, so I am building it piece by piece. 
 
 # Current State
-Rlox has currently implemented up to and including chapter **21** of Crafting Interpreters, with support for global variable declaration and assignment. 
+Rlox has currently implemented up to and including chapter **22** of Crafting Interpreters, with support for global and local variable declaration and assignment, plus block scopes. 
 
 # Usage
 rlox requires rust, and currently has no other crate dependencies. Building and running is as simple as:
