@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use crate::chunk;
 use crate::opcodes;
 use crate::value::Value;
+use std::collections::HashMap;
 
 const DEFAULT_VM_STACK_SIZE: usize = 256;
 
@@ -52,7 +52,7 @@ impl VM {
         Self {
             ip: 0,
             stack: Vec::with_capacity(DEFAULT_VM_STACK_SIZE),
-            globals: HashMap::new()
+            globals: HashMap::new(),
         }
     }
 
@@ -108,7 +108,7 @@ impl VM {
                     return InterpretResult::OK;
                 }
                 opcodes::OP_ADD => {
-                    // Special case for add - string concatenation 
+                    // Special case for add - string concatenation
                     match (self.stack.get(self.stack.len() - 2), self.stack.last()) {
                         (Some(&Value::Double(a)), Some(&Value::Double(b))) => {
                             self.stack.truncate(self.stack.len() - 2);
@@ -121,7 +121,10 @@ impl VM {
                             self.stack.push(concat);
                         }
                         _ => {
-                            self.runtime_error("Operands must be both numbers or both strings".to_string(), line);
+                            self.runtime_error(
+                                "Operands must be both numbers or both strings".to_string(),
+                                line,
+                            );
                             return InterpretResult::RuntimeError;
                         }
                     }
@@ -189,7 +192,6 @@ impl VM {
                     // The value itself will be on the stack
                     let val = self.stack.pop().unwrap();
                     if let Value::String(key) = &chunk.constants[ind] {
-                        println!("VM adding variable: {}: {:?}", key, val);
                         self.globals.insert(key.to_owned(), val);
                         self.stack.pop();
                     } else {
@@ -201,15 +203,16 @@ impl VM {
                     self.ip += 1;
                     if let Value::String(name) = &chunk.constants[ind] {
                         if let Some(value) = self.globals.get(name) {
-                            println!("VM retrieving variable: {}: {:?}", name, value);
                             self.stack.push(value.clone());
                         } else {
                             self.runtime_error(format!("Undefined variable: {}", name), line);
                         }
                     } else {
-                        self.runtime_error("Non-string constant fetched for variable name".to_string(), line);
+                        self.runtime_error(
+                            "Non-string constant fetched for variable name".to_string(),
+                            line,
+                        );
                     }
-
                 }
                 _ => return InterpretResult::RuntimeError,
             }

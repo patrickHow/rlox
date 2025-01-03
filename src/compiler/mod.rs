@@ -161,8 +161,8 @@ impl Compiler {
 
         // Advance the parser to the first token
         parser.advance();
-        
-        // Continuously compile declarations until the end of file is reached 
+
+        // Continuously compile declarations until the end of file is reached
         while !parser.match_and_advance(TokenType::Eof) {
             self.declaration(&mut parser, &mut chunk);
         }
@@ -188,14 +188,13 @@ impl Compiler {
         self.expression_depth -= 1;
     }
 
-    // Core function for compiling declarations 
+    // Core function for compiling declarations
     // A Lox program is a sequence of declarations:
     // declaration -> | class declaration
     //                | function declaration
     //                | variable declaration
     //                | statement
     fn declaration(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
-        
         if parser.match_and_advance(TokenType::Var) {
             self.var_declaration(chunk, parser);
         } else {
@@ -217,7 +216,7 @@ impl Compiler {
     //           | printStmt
     //           | returnStmt
     //           | whileStmt
-    //           | block 
+    //           | block
     fn statement(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
         // TODO do we need to use a match statement with an advance() at the end?
         if parser.match_and_advance(TokenType::Print) {
@@ -241,7 +240,6 @@ impl Compiler {
                 return;
             }
             Some(parse_fn) => {
-                println!("Parsing token {:?}", parser.current.token_type);
                 parse_fn(self, chunk, parser);
             }
         }
@@ -268,26 +266,25 @@ impl Compiler {
 
         while parser.current.token_type != TokenType::Eof {
             if parser.previous.token_type == TokenType::Semicolon {
-                return
+                return;
             }
 
             // Look for a statement boundary - any of these tokens can begin a new statement
             match parser.current.token_type {
                 TokenType::Class => return,
-                TokenType::Fun => return, 
+                TokenType::Fun => return,
                 TokenType::Var => return,
-                TokenType::For => return, 
-                TokenType::If => return, 
-                TokenType::While => return, 
+                TokenType::For => return,
+                TokenType::If => return,
+                TokenType::While => return,
                 TokenType::Print => return,
-                TokenType::Return => return,   
+                TokenType::Return => return,
 
                 _ => {} // Do nothing
             }
 
             parser.advance();
         }
-
     }
 
     fn emit_byte(&self, byte: u8, chunk: &mut Chunk, line: u32) {
@@ -400,12 +397,10 @@ impl Compiler {
     }
 
     fn variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
-        println!("Variable hook");
         self.named_variable(chunk, parser);
     }
 
     fn named_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
-        println!("Requesting global var: {}", parser.previous.lexeme);
         let arg = chunk.add_constant(Value::String(parser.previous.lexeme.clone()));
         self.emit_bytes(opcodes::OP_GET_GLOBAL, arg, chunk, parser.previous.line);
     }
@@ -421,8 +416,11 @@ impl Compiler {
     fn expression_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         // Parse an expression until the semicolon
         self.expression(parser, chunk);
-        parser.consume(TokenType::Semicolon, "Expected ';' after expression".to_string());
-        self.emit_byte(opcodes::OP_POP , chunk, parser.previous.line);
+        parser.consume(
+            TokenType::Semicolon,
+            "Expected ';' after expression".to_string(),
+        );
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
     }
 
     fn parse_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) -> u8 {
@@ -444,11 +442,13 @@ impl Compiler {
             self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line);
         }
 
-        parser.consume(TokenType::Semicolon, "Expected ';' after variable declaration".to_string());
-        
+        parser.consume(
+            TokenType::Semicolon,
+            "Expected ';' after variable declaration".to_string(),
+        );
+
         self.define_variable(global, chunk, parser.previous.line);
     }
-
 }
 
 fn get_rule(token_type: TokenType) -> &'static ParseRule {

@@ -66,8 +66,12 @@ impl Chunk {
             opcodes::OP_LESS => simple_instruction("OP_LESS".to_string(), offset),
             opcodes::OP_PRINT => simple_instruction("OP_PRINT".to_string(), offset),
             opcodes::OP_POP => simple_instruction("OP_POP".to_string(), offset),
-            opcodes::OP_DEFINE_GLOBAL => self.constant_instruction("OP_DEFINE_GLOBAL".to_string(), offset),
-            opcodes::OP_GET_GLOBAL => self.constant_instruction("OP_GET_GLOBAL".to_string(), offset),
+            opcodes::OP_DEFINE_GLOBAL => {
+                self.constant_instruction("OP_DEFINE_GLOBAL".to_string(), offset)
+            }
+            opcodes::OP_GET_GLOBAL => {
+                self.constant_instruction("OP_GET_GLOBAL".to_string(), offset)
+            }
 
             _ => {
                 println!("Invalid opcode {instruction}");

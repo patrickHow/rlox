@@ -13,7 +13,7 @@ impl Value {
             Value::Nil => print!("nil"),
             Value::Bool(v) => print!("{v}"),
             Value::Double(v) => print!("{v}"),
-            Value::String(s) => print!("{s} ({})", s.len()), 
+            Value::String(s) => print!("{s} ({})", s.len()),
         }
     }
 
