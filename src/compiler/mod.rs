@@ -37,6 +37,15 @@ impl Add<u8> for Precedence {
     }
 }
 
+// Struct to hold local variable information
+struct Local {
+    name: Token, // Variable name
+    depth: i32,  // Scope depth of block where variable was declared
+}
+
+// Max number of local variables the compiler can hold at once
+const MAX_LOCAL_VARIABLES: usize = u8::MAX as usize + 1;
+
 struct ParseRule {
     prefix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser, bool)>,
     infix: Option<fn(&mut Compiler, &mut Chunk, &mut Parser, bool)>,
@@ -145,12 +154,16 @@ impl Parser {
 }
 
 pub struct Compiler {
+    locals: Vec<Local>,
+    scope_depth: i32,      // Explicitly signed
     expression_depth: u32, // Track the nesting depth of the expression being compiled
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
+            locals: Vec::with_capacity(MAX_LOCAL_VARIABLES),
+            scope_depth: 0,
             expression_depth: 0,
         }
     }
@@ -218,12 +231,47 @@ impl Compiler {
     //           | whileStmt
     //           | block
     fn statement(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
-        // TODO do we need to use a match statement with an advance() at the end?
         if parser.match_and_advance(TokenType::Print) {
             self.print_statement(chunk, parser);
+        } else if parser.match_and_advance(TokenType::LeftBrace) {
+            self.begin_block();
+            self.block(parser, chunk);
+            self.end_block(chunk, parser.previous.line);
         } else {
             self.expression_statement(chunk, parser);
         }
+    }
+
+    fn block(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
+        while (parser.current.token_type != TokenType::RightBrace)
+            && (parser.current.token_type != TokenType::Eof)
+        {
+            self.declaration(parser, chunk);
+        }
+        // Consume the scope's close bracket - if we have an EOF instead, the program is missing a close bracket
+        parser.consume(
+            TokenType::RightBrace,
+            "Expected '}' after block".to_string(),
+        );
+    }
+
+    fn begin_block(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_block(&mut self, chunk: &mut Chunk, line: u32) {
+        // Pop local variables from the stack as we leave a block
+        self.scope_depth -= 1;
+        let mut i = self.locals.len();
+        while i > 0 {
+            i -= 1;
+            if self.locals[i].depth <= self.scope_depth {
+                break;
+            }
+            self.emit_byte(opcodes::OP_POP, chunk, line);
+        }
+        // ... and remove the locals from the vec
+        self.locals.truncate(i + 1);
     }
 
     // Starts at current token and parses any expression at the given precedence or higher
@@ -410,14 +458,78 @@ impl Compiler {
     }
 
     fn named_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser, can_assign: bool) {
-        let arg = chunk.add_constant(Value::String(parser.previous.lexeme.clone()));
+        let set_op: u8;
+        let get_op: u8;
+
+        // If resolve_local returns Some(u8), the local variable was found
+        // If None, the name must be a global variable
+        let arg = match self.resolve_local(parser) {
+            Some(ind) => {
+                set_op = opcodes::OP_SET_LOCAL;
+                get_op = opcodes::OP_GET_LOCAL;
+                ind
+            }
+            None => {
+                set_op = opcodes::OP_SET_GLOBAL;
+                get_op = opcodes::OP_GET_GLOBAL;
+                chunk.add_constant(Value::String(parser.previous.lexeme.clone()))
+            }
+        };
 
         if can_assign && parser.match_and_advance(TokenType::Equal) {
             self.expression(parser, chunk);
-            self.emit_bytes(opcodes::OP_SET_GLOBAL, arg, chunk, parser.previous.line);
+            self.emit_bytes(set_op, arg, chunk, parser.previous.line);
         } else {
-            self.emit_bytes(opcodes::OP_GET_GLOBAL, arg, chunk, parser.previous.line);
+            self.emit_bytes(get_op, arg, chunk, parser.previous.line);
         }
+    }
+
+    // Find a local variable by token name in the locals vec
+    fn resolve_local(&self, parser: &mut Parser) -> Option<u8> {
+        for (i, local) in self.locals.iter().rev().enumerate() {
+            if local.name.lexeme == parser.previous.lexeme {
+                if local.depth == -1 {
+                    parser.error_on_prev(
+                        "Cannot read local variable in its own initalizer".to_string(),
+                    );
+                }
+                return Some(i as u8);
+            }
+        }
+        None
+    }
+
+    fn declare_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        // If we're at the global scope, don't declare the variable
+        if self.scope_depth == 0 {
+            return;
+        }
+
+        // Otherwise we're at a local scope, add the new local variable
+        if self.locals.len() >= MAX_LOCAL_VARIABLES {
+            parser.error_on_prev("Too many local variables in function".to_string());
+            return;
+        }
+        let new_local = Local {
+            name: parser.previous.clone(),
+            depth: -1, // Special value indicating the variable is uninitialized
+        };
+
+        // See if a variable with this name already exists at this scope
+        // Local variables are appended, so variables in the current scope will be at the end of the array
+        // Therefore we check elements backwards and break if we find a lower depth variable, since that is in a different scope
+        for local in self.locals.iter().rev() {
+            if local.depth != -1 && local.depth < self.scope_depth {
+                break;
+            }
+            // Check if variable in the same scope has the same name as the variable we're trying to declare
+            if local.name.lexeme == new_local.name.lexeme {
+                parser.error_on_prev("Already a variable with this name in this scope".to_string());
+                return;
+            }
+        }
+
+        self.locals.push(new_local);
     }
 
     // Evaluate an expression and print the result
@@ -440,20 +552,31 @@ impl Compiler {
 
     fn parse_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) -> u8 {
         parser.consume(TokenType::Identifier, "Expected variable name".to_string());
+        self.declare_variable(chunk, parser);
+        // If we've just declared a local variable, no need to add the constant
+        if self.scope_depth > 0 {
+            return 0;
+        }
         return chunk.add_constant(Value::String(parser.previous.lexeme.clone()));
     }
 
     fn define_variable(&mut self, global: u8, chunk: &mut Chunk, line: u32) {
+        // No definition required for locals other than marking them initialized
+        if self.scope_depth > 0 {
+            self.locals.last_mut().unwrap().depth = self.scope_depth;
+            return;
+        }
         self.emit_bytes(opcodes::OP_DEFINE_GLOBAL, global, chunk, line);
     }
 
     fn var_declaration(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         let global = self.parse_variable(chunk, parser);
 
+        // Default variables to nil value if no assignment is given
+        // i.e. var a; -> a == nil
         if parser.match_and_advance(TokenType::Equal) {
             self.expression(parser, chunk);
         } else {
-            // TODO double check the line here
             self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line);
         }
 

@@ -1,5 +1,6 @@
 use crate::chunk;
 use crate::opcodes;
+use crate::opcodes::OP_SET_LOCAL;
 use crate::value::Value;
 use std::collections::HashMap;
 
@@ -230,6 +231,20 @@ impl VM {
                     } else {
                         self.runtime_error("Non-string value for variable name".to_string(), line);
                     }
+                }
+                opcodes::OP_GET_LOCAL => {
+                    // Get the stack slot where the local variable lives
+                    let slot = chunk.code[self.ip] as usize;
+                    self.ip += 1;
+                    // Put it on the stack
+                    self.stack.push(self.stack[slot].clone());
+                }
+                opcodes::OP_SET_LOCAL => {
+                    // Get the value from the top of the stack and update the variable's slot
+                    let slot = chunk.code[self.ip] as usize;
+                    self.ip += 1;
+                    self.stack[slot] = self.stack.last().unwrap().clone();
+                    // Note we don't pop the stack - assignment is an expression and therefore produces a value
                 }
                 _ => return InterpretResult::RuntimeError,
             }

@@ -75,6 +75,8 @@ impl Chunk {
             opcodes::OP_SET_GLOBAL => {
                 self.constant_instruction("OP_SET_GLOBAL".to_string(), offset)
             }
+            opcodes::OP_SET_LOCAL => self.byte_instruction("OP_SET_LOCAL".to_string(), offset),
+            opcodes::OP_GET_LOCAL => self.byte_instruction("OP_GET_LOCAL".to_string(), offset),
 
             _ => {
                 println!("Invalid opcode {instruction}");
@@ -91,6 +93,14 @@ impl Chunk {
         let value = &self.constants[ind];
         print!("{name}: ");
         value.print();
+        println!();
+        return offset + 2;
+    }
+
+    fn byte_instruction(&self, name: String, offset: usize) -> usize {
+        let slot = self.code[offset + 1];
+        print!("{name}: {}", slot);
+
         println!();
         return offset + 2;
     }
