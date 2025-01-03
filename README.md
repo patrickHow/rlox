@@ -6,6 +6,9 @@ Specifically, rlox is my attempt at a rust implementation of the third part of t
 rlox is, therefore, a bytecode virtual machine, scanner, and compiler. rlox is still very much a work in progress and is not yet a complete Lox implementation. 
 This project is primarily for my own learning, so I am building it piece by piece. 
 
+# Current State
+Rlox has currently implemented up to and including chapter **21** of Crafting Interpreters, with support for global variable declaration and assignment. 
+
 # Usage
 rlox requires rust, and currently has no other crate dependencies. Building and running is as simple as:
 `cargo run`
