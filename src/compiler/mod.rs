@@ -189,7 +189,7 @@ impl Compiler {
     }
 
     // Core function for compiling expressions - can be called recursively
-    // An expression is a bit of Lox that produces a value - 1 + 2
+    // An expression is a bit of Lox that produces a value
     fn expression(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
         self.expression_depth += 1;
         if self.expression_depth > MAX_EXPRESSION_NESTING {
@@ -233,6 +233,8 @@ impl Compiler {
     fn statement(&mut self, parser: &mut Parser, chunk: &mut Chunk) {
         if parser.match_and_advance(TokenType::Print) {
             self.print_statement(chunk, parser);
+        } else if parser.match_and_advance(TokenType::If) {
+            self.if_statement(chunk, parser);
         } else if parser.match_and_advance(TokenType::LeftBrace) {
             self.begin_block();
             self.block(parser, chunk);
@@ -540,6 +542,59 @@ impl Compiler {
         self.expression(parser, chunk);
         parser.consume(TokenType::Semicolon, "Expected ';' after value".to_string());
         self.emit_byte(opcodes::OP_PRINT, chunk, parser.previous.line);
+    }
+
+    fn if_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        // Every if statement will have an implicit else
+
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'if'".to_string());
+        // Compiling the expression value leaves it on the stack
+        self.expression(parser, chunk);
+        parser.consume(
+            TokenType::RightParen,
+            "Expect ')' after condition".to_string(),
+        );
+
+        // Emit a jump with a placeholder operand to jump past the statement
+        let if_body_jump = self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk);
+        // Pop the expression condition from the stack if condition is truthy
+        // (i.e. put it right before the if statement body)
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+        // Compile the if statement body
+        self.statement(parser, chunk);
+        // Emit an unconditional jump over the else body
+        let else_body_jump = self.emit_jump(opcodes::OP_JUMP, parser.previous.line, chunk);
+        // Backpatch the jump over the if body
+        self.patch_jump(if_body_jump, chunk, parser);
+        // If condition is falsey, pop it before the else branch
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+
+        // Is there an else following the if?
+        if parser.match_and_advance(TokenType::Else) {
+            self.statement(parser, chunk);
+        }
+
+        // Patch the jump over the else body
+        self.patch_jump(else_body_jump, chunk, parser);
+    }
+
+    fn emit_jump(&mut self, op: u8, line: u32, chunk: &mut Chunk) -> usize {
+        self.emit_byte(op, chunk, line);
+        // Emit two dummy bytes - expect these will be backpatched
+        self.emit_bytes(0xFF, 0xFF, chunk, line);
+        return chunk.code.len() - 2;
+    }
+
+    fn patch_jump(&mut self, ind: usize, chunk: &mut Chunk, parser: &mut Parser) {
+        // -2 to adjust for the bytecode of the jump operand itself
+        let jump = chunk.code.len() - ind - 2;
+        if jump > u16::MAX as usize {
+            parser.error_on_prev("Too much code to jump over".to_string());
+            return;
+        }
+
+        chunk.code[ind] = ((jump >> 8) & 0xFF) as u8;
+        chunk.code[ind + 1] = (jump & 0xFF) as u8;
     }
 
     fn expression_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {

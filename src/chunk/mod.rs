@@ -9,7 +9,7 @@ pub struct Chunk {
     pub constants: Vec<Value>,
 }
 
-fn simple_instruction(name: String, offset: usize) -> usize {
+fn simple_instruction(name: &str, offset: usize) -> usize {
     println!("{name}");
     return offset + 1;
 }
@@ -24,7 +24,7 @@ impl Chunk {
     }
 
     // Debug function for disassembling a whole chunk
-    pub fn disassemble(&self, name: String) {
+    pub fn disassemble(&self, name: &str) {
         // Print a header for convenience
         println!("== {} ==", name);
 
@@ -50,34 +50,29 @@ impl Chunk {
 
         let instruction = self.code[offset];
         match instruction {
-            opcodes::OP_RETURN => simple_instruction("OP_RETURN".to_string(), offset),
-            opcodes::OP_CONSTANT => self.constant_instruction("OP_CONSTANT".to_string(), offset),
-            opcodes::OP_ADD => simple_instruction("OP_ADD".to_string(), offset),
-            opcodes::OP_SUBTRACT => simple_instruction("OP_SUBTRACT".to_string(), offset),
-            opcodes::OP_MULTIPLY => simple_instruction("OP_MULTIPLY".to_string(), offset),
-            opcodes::OP_DIVIDE => simple_instruction("OP_DIVIDE".to_string(), offset),
-            opcodes::OP_NEGATE => simple_instruction("OP_NEGATE".to_string(), offset),
-            opcodes::OP_NIL => simple_instruction("OP_NIL".to_string(), offset),
-            opcodes::OP_FALSE => simple_instruction("OP_FALSE".to_string(), offset),
-            opcodes::OP_TRUE => simple_instruction("OP_TRUE".to_string(), offset),
-            opcodes::OP_NOT => simple_instruction("OP_NOT".to_string(), offset),
-            opcodes::OP_EQUAL => simple_instruction("OP_EQUAL".to_string(), offset),
-            opcodes::OP_GREATER => simple_instruction("OP_GREATER".to_string(), offset),
-            opcodes::OP_LESS => simple_instruction("OP_LESS".to_string(), offset),
-            opcodes::OP_PRINT => simple_instruction("OP_PRINT".to_string(), offset),
-            opcodes::OP_POP => simple_instruction("OP_POP".to_string(), offset),
-            opcodes::OP_DEFINE_GLOBAL => {
-                self.constant_instruction("OP_DEFINE_GLOBAL".to_string(), offset)
-            }
-            opcodes::OP_GET_GLOBAL => {
-                self.constant_instruction("OP_GET_GLOBAL".to_string(), offset)
-            }
-            opcodes::OP_SET_GLOBAL => {
-                self.constant_instruction("OP_SET_GLOBAL".to_string(), offset)
-            }
-            opcodes::OP_SET_LOCAL => self.byte_instruction("OP_SET_LOCAL".to_string(), offset),
-            opcodes::OP_GET_LOCAL => self.byte_instruction("OP_GET_LOCAL".to_string(), offset),
-
+            opcodes::OP_RETURN => simple_instruction("OP_RETURN", offset),
+            opcodes::OP_CONSTANT => self.constant_instruction("OP_CONSTANT", offset),
+            opcodes::OP_ADD => simple_instruction("OP_ADD", offset),
+            opcodes::OP_SUBTRACT => simple_instruction("OP_SUBTRACT", offset),
+            opcodes::OP_MULTIPLY => simple_instruction("OP_MULTIPLY", offset),
+            opcodes::OP_DIVIDE => simple_instruction("OP_DIVIDE", offset),
+            opcodes::OP_NEGATE => simple_instruction("OP_NEGATE", offset),
+            opcodes::OP_NIL => simple_instruction("OP_NIL", offset),
+            opcodes::OP_FALSE => simple_instruction("OP_FALSE", offset),
+            opcodes::OP_TRUE => simple_instruction("OP_TRUE", offset),
+            opcodes::OP_NOT => simple_instruction("OP_NOT", offset),
+            opcodes::OP_EQUAL => simple_instruction("OP_EQUAL", offset),
+            opcodes::OP_GREATER => simple_instruction("OP_GREATER", offset),
+            opcodes::OP_LESS => simple_instruction("OP_LESS", offset),
+            opcodes::OP_PRINT => simple_instruction("OP_PRINT", offset),
+            opcodes::OP_POP => simple_instruction("OP_POP", offset),
+            opcodes::OP_DEFINE_GLOBAL => self.constant_instruction("OP_DEFINE_GLOBAL", offset),
+            opcodes::OP_GET_GLOBAL => self.constant_instruction("OP_GET_GLOBAL", offset),
+            opcodes::OP_SET_GLOBAL => self.constant_instruction("OP_SET_GLOBAL", offset),
+            opcodes::OP_SET_LOCAL => self.byte_instruction("OP_SET_LOCAL", offset),
+            opcodes::OP_GET_LOCAL => self.byte_instruction("OP_GET_LOCAL", offset),
+            opcodes::OP_JUMP => self.jump_instruction("OP_JUMP", 1, offset),
+            opcodes::OP_JUMP_IF_FALSE => self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset),
             _ => {
                 println!("Invalid opcode {instruction}");
                 offset + 1 // Advance past the bad instruction
@@ -86,7 +81,7 @@ impl Chunk {
     }
 
     // Disassemble helper for constant instruction
-    fn constant_instruction(&self, name: String, offset: usize) -> usize {
+    fn constant_instruction(&self, name: &str, offset: usize) -> usize {
         // Second byte of the instruction will the index of the constant
         // in the chunk's constant array
         let ind = self.code[offset + 1] as usize;
@@ -97,12 +92,20 @@ impl Chunk {
         return offset + 2;
     }
 
-    fn byte_instruction(&self, name: String, offset: usize) -> usize {
+    fn byte_instruction(&self, name: &str, offset: usize) -> usize {
         let slot = self.code[offset + 1];
         print!("{name}: {}", slot);
 
         println!();
         return offset + 2;
+    }
+
+    fn jump_instruction(&self, name: &str, sign: i16, offset: usize) -> usize {
+        let jump = (((self.code[offset + 1] as u16) << 8) + (self.code[offset + 2] as u16)) as i16;
+
+        println!("{name}: {}->{}", offset, (offset as i16 + 3 + sign * jump));
+
+        return offset + 3;
     }
 
     // Write bytecode to the chunk

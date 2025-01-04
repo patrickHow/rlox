@@ -28,6 +28,8 @@ impl Interpreter {
 
     fn interpret(&mut self, source: String) -> vm::InterpretResult {
         if let Some(chunk) = self.compiler.compile(source) {
+            // TODO make this a flag
+            chunk.disassemble("Full Bytecode");
             return self.vm.run(chunk);
         } else {
             return vm::InterpretResult::CompileError;
@@ -53,7 +55,7 @@ impl Interpreter {
 
 fn main() {
     // Turn on for backtrace on panic
-    // env::set_var("RUST_BACKTRACE", "1");
+    env::set_var("RUST_BACKTRACE", "1");
 
     let mut interpreter = Interpreter::new();
 

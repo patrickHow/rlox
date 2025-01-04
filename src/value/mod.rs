@@ -13,12 +13,12 @@ impl Value {
             Value::Nil => print!("nil"),
             Value::Bool(v) => print!("{v}"),
             Value::Double(v) => print!("{v}"),
-            Value::String(s) => print!("{s} ({})", s.len()),
+            Value::String(s) => print!("{s}"),
         }
     }
 
     // Return the "falsiness" of the value
-    // Yes, I dislike this owrd as well
+    // Yes, I dislike this word as well
     pub fn is_falsey(&self) -> bool {
         match self {
             Value::Nil => true,

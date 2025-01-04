@@ -79,9 +79,14 @@ impl VM {
     pub fn run(&mut self, chunk: chunk::Chunk) -> InterpretResult {
         self.reset();
 
+        println!("\n== VM Starting ==\n");
+
         loop {
             if cfg!(debug_assertions) {
+                // Print the instruction pointer
+                println!("ip: {}", self.ip);
                 // Dump the stack trace
+                print!("stack: ");
                 for val in &self.stack {
                     print!("[");
                     val.print();
@@ -245,6 +250,22 @@ impl VM {
                     self.ip += 1;
                     self.stack[slot] = self.stack.last().unwrap().clone();
                     // Note we don't pop the stack - assignment is an expression and therefore produces a value
+                }
+                opcodes::OP_JUMP_IF_FALSE => {
+                    let offset: usize = (((chunk.code[self.ip] as u16) << 8)
+                        | (chunk.code[self.ip + 1] as u16))
+                        as usize;
+                    self.ip += 2;
+                    if self.stack.last().unwrap().is_falsey() {
+                        self.ip += offset;
+                    }
+                }
+                opcodes::OP_JUMP => {
+                    let offset: usize = (((chunk.code[self.ip] as u16) << 8)
+                        | (chunk.code[self.ip + 1] as u16))
+                        as usize;
+                    self.ip += 2;
+                    self.ip += offset;
                 }
                 _ => return InterpretResult::RuntimeError,
             }
