@@ -446,6 +446,35 @@ impl Compiler {
         }
     }
 
+    fn and(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
+        // Assuming we have some expression " a & b"
+        // Compile the left side first, putting the value on the stack
+        // If the value is false(y) we can jump past the right expression, i.e. a short circuit eval
+        // Note this leaves the lhs value on the stack to be the result of the entire expression
+        let end_jump = self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk);
+        // If the lhs expression is true, pop it from the stack and continue to the right side
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+        // Compile the right side
+        self.parse_precedence(parser, chunk, Precedence::And);
+        // Jump over the right side if the left side is false
+        self.patch_jump(end_jump, chunk, parser);
+    }
+
+    fn or(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
+        // If the lhs is false(y), we jump over one statement to evaluate the rhs
+        let else_jump = self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk);
+        // If the lhs is truthy, we come to this jump and skip the rest of the expression
+        let end_jump = self.emit_jump(opcodes::OP_JUMP, parser.previous.line, chunk);
+
+        self.patch_jump(else_jump, chunk, parser);
+        // Pop the lhs if it was false, otherwise leaving it on the stack as the (true) result of the expression
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+
+        // Parse the rhs and jump over it if the lhs is true
+        self.parse_precedence(parser, chunk, Precedence::Or);
+        self.patch_jump(end_jump, chunk, parser);
+    }
+
     fn literal(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         match parser.previous.token_type {
             TokenType::Nil => self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line),
@@ -679,7 +708,7 @@ fn get_rule(token_type: TokenType) -> &'static ParseRule {
         ParseRule::new(Some(Compiler::string), None, Precedence::None), // String
         ParseRule::new(Some(Compiler::number), None, Precedence::None), // Number
         // Keywords
-        ParseRule::new(None, None, Precedence::None), // And
+        ParseRule::new(None, Some(Compiler::and), Precedence::And), // And
         ParseRule::new(None, None, Precedence::None), // Class
         ParseRule::new(None, None, Precedence::None), // Else
         ParseRule::new(Some(Compiler::literal), None, Precedence::None), // False
@@ -687,7 +716,7 @@ fn get_rule(token_type: TokenType) -> &'static ParseRule {
         ParseRule::new(None, None, Precedence::None), // Fun
         ParseRule::new(None, None, Precedence::None), // If
         ParseRule::new(Some(Compiler::literal), None, Precedence::None), // Nil
-        ParseRule::new(None, None, Precedence::None), // Or
+        ParseRule::new(Some(Compiler::or), None, Precedence::Or), // Or
         ParseRule::new(None, None, Precedence::None), // Print
         ParseRule::new(None, None, Precedence::None), // Return
         ParseRule::new(None, None, Precedence::None), // Super
