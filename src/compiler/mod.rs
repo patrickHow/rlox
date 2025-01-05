@@ -97,7 +97,6 @@ impl Parser {
     }
 
     fn advance(&mut self) {
-        // TODO find a better way to do this
         self.previous = self.current.clone();
 
         match self.scanner.scan_token(&self.source) {
@@ -116,7 +115,7 @@ impl Parser {
 
     // Attempt to consume a token of a specific type, emitting an error
     // message if a different token is encountered
-    fn consume(&mut self, token_type: TokenType, msg: String) {
+    fn consume(&mut self, token_type: TokenType, msg: &str) {
         if self.current.token_type == token_type {
             self.advance();
         } else {
@@ -133,7 +132,7 @@ impl Parser {
         }
     }
 
-    fn error_on_prev(&mut self, msg: String) {
+    fn error_on_prev(&mut self, msg: &str) {
         if self.panic_mode {
             return;
         }
@@ -143,7 +142,7 @@ impl Parser {
         self.previous.error(msg);
     }
 
-    fn error_on_current(&mut self, msg: String) {
+    fn error_on_current(&mut self, msg: &str) {
         if self.panic_mode {
             return;
         }
@@ -256,10 +255,7 @@ impl Compiler {
             self.declaration(parser, chunk);
         }
         // Consume the scope's close bracket - if we have an EOF instead, the program is missing a close bracket
-        parser.consume(
-            TokenType::RightBrace,
-            "Expected '}' after block".to_string(),
-        );
+        parser.consume(TokenType::RightBrace, "Expected '}' after block");
     }
 
     fn begin_block(&mut self) {
@@ -294,7 +290,7 @@ impl Compiler {
         // Otherwise, call the function to parse the token
         match rule.prefix {
             None => {
-                parser.error_on_prev("Expected expression".to_string());
+                parser.error_on_prev("Expected expression");
                 return;
             }
             Some(parse_fn) => {
@@ -308,7 +304,7 @@ impl Compiler {
             let infix_rule = get_rule(parser.previous.token_type);
             match infix_rule.infix {
                 None => {
-                    parser.error_on_prev("No rule to parse token".to_string());
+                    parser.error_on_prev("No rule to parse token");
                     return;
                 }
                 Some(parse_fn) => {
@@ -319,7 +315,7 @@ impl Compiler {
             // Catch the case where the lhs of an = is not a valid assignment
             // i.e. some expression like a*b = c+d;
             if can_assign && parser.match_and_advance(TokenType::Equal) {
-                parser.error_on_prev("Invalid assignment target".to_string());
+                parser.error_on_prev("Invalid assignment target");
             }
         }
     }
@@ -391,10 +387,7 @@ impl Compiler {
     // Recursively compile a grouping within parentheses
     fn grouping(&mut self, chunk: &mut Chunk, parser: &mut Parser, _can_assign: bool) {
         self.expression(parser, chunk);
-        parser.consume(
-            TokenType::RightParen,
-            "Expected ')' after expression".to_string(),
-        );
+        parser.consume(TokenType::RightParen, "Expected ')' after expression");
     }
 
     // Compiles a unary operation, such as negation
@@ -525,9 +518,7 @@ impl Compiler {
         for (i, local) in self.locals.iter().enumerate().rev() {
             if local.name.lexeme == parser.previous.lexeme {
                 if local.depth == -1 {
-                    parser.error_on_prev(
-                        "Cannot read local variable in its own initalizer".to_string(),
-                    );
+                    parser.error_on_prev("Cannot read local variable in its own initalizer");
                 }
                 return Some(i as u8);
             }
@@ -543,7 +534,7 @@ impl Compiler {
 
         // Otherwise we're at a local scope, add the new local variable
         if self.locals.len() >= MAX_LOCAL_VARIABLES {
-            parser.error_on_prev("Too many local variables in function".to_string());
+            parser.error_on_prev("Too many local variables in function");
             return;
         }
         let new_local = Local {
@@ -560,7 +551,7 @@ impl Compiler {
             }
             // Check if variable in the same scope has the same name as the variable we're trying to declare
             if local.name.lexeme == new_local.name.lexeme {
-                parser.error_on_prev("Already a variable with this name in this scope".to_string());
+                parser.error_on_prev("Already a variable with this name in this scope");
                 return;
             }
         }
@@ -571,20 +562,17 @@ impl Compiler {
     fn print_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         // Parse and compile the expression, then consume the semicolon
         self.expression(parser, chunk);
-        parser.consume(TokenType::Semicolon, "Expected ';' after value".to_string());
+        parser.consume(TokenType::Semicolon, "Expected ';' after value");
         self.emit_byte(opcodes::OP_PRINT, chunk, parser.previous.line);
     }
 
     fn if_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         // Every if statement will have an implicit else
 
-        parser.consume(TokenType::LeftParen, "Expect '(' after 'if'".to_string());
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'if'");
         // Compiling the expression value leaves it on the stack
         self.expression(parser, chunk);
-        parser.consume(
-            TokenType::RightParen,
-            "Expect ')' after condition".to_string(),
-        );
+        parser.consume(TokenType::RightParen, "Expect ')' after condition");
 
         // Emit a jump with a placeholder operand to jump past the statement
         let if_body_jump = self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk);
@@ -611,13 +599,10 @@ impl Compiler {
 
     fn while_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         let loop_start = chunk.code.len();
-        parser.consume(TokenType::LeftParen, "Expect '(' after 'while'".to_string());
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'while'");
         // Compiling the expression value leaves it on the stack
         self.expression(parser, chunk);
-        parser.consume(
-            TokenType::RightParen,
-            "Expect ')' after condition".to_string(),
-        );
+        parser.consume(TokenType::RightParen, "Expect ')' after condition");
         // Check the value of the expression
         let exit_jump = self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk);
         // Pop the condition if we don't jump
@@ -637,7 +622,7 @@ impl Compiler {
     fn for_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         // for (initializer; condition; increment) <- all are optional
         self.begin_block();
-        parser.consume(TokenType::LeftParen, "Expect '(' after 'for'".to_string());
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'for'");
 
         // Parse the initializer - can be:
         // A new variable declaration, i.e. var i = 0;
@@ -658,10 +643,7 @@ impl Compiler {
         let mut exit_jump: Option<usize> = None;
         if !parser.match_and_advance(TokenType::Semicolon) {
             self.expression(parser, chunk);
-            parser.consume(
-                TokenType::Semicolon,
-                "Expect ';' after loop condition".to_string(),
-            );
+            parser.consume(TokenType::Semicolon, "Expect ';' after loop condition");
             // Jump out of the loop if the expression is false
             exit_jump =
                 Some(self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk));
@@ -677,10 +659,7 @@ impl Compiler {
             self.expression(parser, chunk);
             // Pop the expression result - we only care about the side effect
             self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
-            parser.consume(
-                TokenType::RightParen,
-                "Expect ')' after for clauses".to_string(),
-            );
+            parser.consume(TokenType::RightParen, "Expect ')' after for clauses");
 
             // Emit a jump to the loop start, then change the loop start value
             self.emit_loop(loop_start, chunk, parser);
@@ -714,7 +693,7 @@ impl Compiler {
         // -2 to adjust for the bytecode of the jump operand itself
         let jump = chunk.code.len() - ind - 2;
         if jump > u16::MAX as usize {
-            parser.error_on_prev("Too much code to jump over".to_string());
+            parser.error_on_prev("Too much code to jump over");
             return;
         }
 
@@ -739,15 +718,12 @@ impl Compiler {
     fn expression_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
         // Parse an expression until the semicolon
         self.expression(parser, chunk);
-        parser.consume(
-            TokenType::Semicolon,
-            "Expected ';' after expression".to_string(),
-        );
+        parser.consume(TokenType::Semicolon, "Expected ';' after expression");
         self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
     }
 
     fn parse_variable(&mut self, chunk: &mut Chunk, parser: &mut Parser) -> u8 {
-        parser.consume(TokenType::Identifier, "Expected variable name".to_string());
+        parser.consume(TokenType::Identifier, "Expected variable name");
         self.declare_variable(chunk, parser);
         // If we've just declared a local variable, no need to add the constant
         if self.scope_depth > 0 {
@@ -778,7 +754,7 @@ impl Compiler {
 
         parser.consume(
             TokenType::Semicolon,
-            "Expected ';' after variable declaration".to_string(),
+            "Expected ';' after variable declaration",
         );
 
         self.define_variable(global, chunk, parser.previous.line);

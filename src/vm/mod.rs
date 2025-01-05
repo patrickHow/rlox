@@ -70,7 +70,7 @@ impl VM {
                 true
             }
             _ => {
-                self.runtime_error("Operands must be numbers".to_string(), line);
+                self.runtime_error("Operands must be numbers", line);
                 false
             }
         }
@@ -128,7 +128,7 @@ impl VM {
                         }
                         _ => {
                             self.runtime_error(
-                                "Operands must be both numbers or both strings".to_string(),
+                                "Operands must be both numbers or both strings",
                                 line,
                             );
                             return InterpretResult::RuntimeError;
@@ -155,7 +155,7 @@ impl VM {
                         *self.stack.last_mut().unwrap() = Value::Double(-v);
                     }
                     _ => {
-                        self.runtime_error("Operand must be a number".to_string(), line);
+                        self.runtime_error("Operand must be a number", line);
                         return InterpretResult::RuntimeError;
                     }
                 },
@@ -201,7 +201,7 @@ impl VM {
                         self.globals.insert(key.to_owned(), val);
                         self.stack.pop();
                     } else {
-                        self.runtime_error("Non-string value for variable name".to_string(), line);
+                        self.runtime_error("Non-string value for variable name", line);
                     }
                 }
                 opcodes::OP_GET_GLOBAL => {
@@ -211,13 +211,13 @@ impl VM {
                         if let Some(value) = self.globals.get(name) {
                             self.stack.push(value.clone());
                         } else {
-                            self.runtime_error(format!("Undefined variable: {}", name), line);
+                            self.runtime_error(
+                                format!("Undefined variable: {}", name).as_str(),
+                                line,
+                            );
                         }
                     } else {
-                        self.runtime_error(
-                            "Non-string constant fetched for variable name".to_string(),
-                            line,
-                        );
+                        self.runtime_error("Non-string constant fetched for variable name", line);
                     }
                 }
                 opcodes::OP_SET_GLOBAL => {
@@ -229,12 +229,15 @@ impl VM {
                         // Valid variable name, does it exist?
                         match self.globals.get_mut(key) {
                             None => {
-                                self.runtime_error(format!("Undefined variable {}", key), line);
+                                self.runtime_error(
+                                    format!("Undefined variable {}", key).as_str(),
+                                    line,
+                                );
                             }
                             Some(v) => *v = val.clone(),
                         }
                     } else {
-                        self.runtime_error("Non-string value for variable name".to_string(), line);
+                        self.runtime_error("Non-string value for variable name", line);
                     }
                 }
                 opcodes::OP_GET_LOCAL => {
@@ -279,7 +282,7 @@ impl VM {
         }
     }
 
-    fn runtime_error(&mut self, msg: String, line: u32) {
+    fn runtime_error(&mut self, msg: &str, line: u32) {
         println!("[line {line}]: runtime error: {msg}");
     }
 }

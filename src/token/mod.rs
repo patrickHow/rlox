@@ -88,7 +88,7 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn error(&self, msg: String) {
+    pub fn error(&self, msg: &str) {
         print!("[Line {}] Error", self.line);
         if self.token_type == TokenType::Eof {
             print!(" at end");
