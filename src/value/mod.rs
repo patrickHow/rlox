@@ -1,10 +1,14 @@
+pub mod function;
+use function::Function;
+
 // Enum wrapping the types that a Lox variable can have
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Value {
     Nil,
     Bool(bool),
     Double(f64),
     String(String),
+    Func(Function)
 }
 
 impl Value {
@@ -14,6 +18,7 @@ impl Value {
             Value::Bool(v) => print!("{v}"),
             Value::Double(v) => print!("{v}"),
             Value::String(s) => print!("{s}"),
+            Value::Func(f) => print!("{}", f.name),
         }
     }
 
@@ -25,6 +30,7 @@ impl Value {
             Value::Bool(v) => !v,
             Value::Double(_) => false,
             Value::String(_) => false,
+            Value::Func(_) => false, // Please do not the function
         }
     }
 }

@@ -6,9 +6,7 @@ use std::collections::HashMap;
 const DEFAULT_VM_STACK_SIZE: usize = 256;
 
 // Const functions for doing binary operations
-const fn add(a: f64, b: f64) -> Value {
-    Value::Double(a + b)
-}
+// Add is missing because that has a special case - string concatenation
 const fn sub(a: f64, b: f64) -> Value {
     Value::Double(a - b)
 }

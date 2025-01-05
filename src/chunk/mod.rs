@@ -2,7 +2,7 @@ use crate::opcodes;
 use crate::value::Value;
 
 const DEFAULT_CHUNK_LEN: usize = 16;
-
+#[derive(Clone)]
 pub struct Chunk {
     pub code: Vec<u8>,
     pub lines: Vec<u32>,
