@@ -5,6 +5,7 @@ use crate::token::{Token, TokenType, TOKEN_COUNT};
 use crate::value::Value;
 use core::panic;
 use std::ops::Add;
+use std::process::exit;
 
 const MAX_EXPRESSION_NESTING: u32 = 50;
 
@@ -237,6 +238,8 @@ impl Compiler {
             self.if_statement(chunk, parser);
         } else if parser.match_and_advance(TokenType::While) {
             self.while_statement(chunk, parser);
+        } else if parser.match_and_advance(TokenType::For) {
+            self.for_statement(chunk, parser);
         } else if parser.match_and_advance(TokenType::LeftBrace) {
             self.begin_block();
             self.block(parser, chunk);
@@ -629,6 +632,75 @@ impl Compiler {
         // Set the jump point here
         self.patch_jump(exit_jump, chunk, parser);
         self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+    }
+
+    fn for_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        // for (initializer; condition; increment) <- all are optional
+        self.begin_block();
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'for'".to_string());
+
+        // Parse the initializer - can be:
+        // A new variable declaration, i.e. var i = 0;
+        // An expression, i.e. i = 0;
+        // Nothing - just a ;
+        if parser.match_and_advance(TokenType::Semicolon) {
+            // No initializer - fall through
+        } else if parser.match_and_advance(TokenType::Var) {
+            self.var_declaration(chunk, parser);
+        } else {
+            // Note this is a full expression statement - must be semicolon terminated
+            self.expression_statement(chunk, parser);
+        }
+
+        // Parse the condition - the true loop will start here
+        let mut loop_start = chunk.code.len();
+
+        let mut exit_jump: Option<usize> = None;
+        if !parser.match_and_advance(TokenType::Semicolon) {
+            self.expression(parser, chunk);
+            parser.consume(
+                TokenType::Semicolon,
+                "Expect ';' after loop condition".to_string(),
+            );
+            // Jump out of the loop if the expression is false
+            exit_jump =
+                Some(self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk));
+            self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+        }
+
+        // Check for an increment clause
+        if !parser.match_and_advance(TokenType::RightParen) {
+            // If we have an increment clause, we jump over it, run the body,
+            // jump back to the increment clause and run it, then go to the next iteration
+            let body_jump = self.emit_jump(opcodes::OP_JUMP, parser.previous.line, chunk);
+            let increment_start = chunk.code.len();
+            self.expression(parser, chunk);
+            // Pop the expression result - we only care about the side effect
+            self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+            parser.consume(
+                TokenType::RightParen,
+                "Expect ')' after for clauses".to_string(),
+            );
+
+            // Emit a jump to the loop start, then change the loop start value
+            self.emit_loop(loop_start, chunk, parser);
+            // When we emit the loop for this later, we will jump to the increment start
+            // This gives us the increment->condition->body flow that we expect
+            loop_start = increment_start;
+            // Patch the jump to the start of the body
+            self.patch_jump(body_jump, chunk, parser);
+        }
+
+        // Compile the actual for loop body
+        self.statement(parser, chunk);
+        self.emit_loop(loop_start, chunk, parser);
+
+        // Patch the jump if we need to (i.e. if the loop has an exit condition)
+        if let Some(jump) = exit_jump {
+            self.patch_jump(jump, chunk, parser);
+            self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+        }
+        self.end_block(chunk, parser.previous.line);
     }
 
     fn emit_jump(&mut self, op: u8, line: u32, chunk: &mut Chunk) -> usize {
