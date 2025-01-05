@@ -21,3 +21,4 @@ pub const OP_GET_LOCAL: u8 = 19; // [opcode][ind] - load the value in the variab
 pub const OP_SET_LOCAL: u8 = 20; // [opcode][ind] - set the value in the variable whose name is stored at the index in the constant table to the value on the stack
 pub const OP_JUMP: u8 = 21; // [opcode][operand_hi][operand_lo] - offset the instruction pointer by the 16-bit operand
 pub const OP_JUMP_IF_FALSE: u8 = 22; // [opcode][operand_hi][operand_lo] - if the value on the top of the stack is false(y), offset the instruction pointer by the 16-bit operand
+pub const OP_LOOP: u8 = 23; // [opcode][operand_hi][operand_lo] - unconditionally subtract the 16-bit value in the operand from the instruction pointer

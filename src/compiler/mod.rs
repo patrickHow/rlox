@@ -235,6 +235,8 @@ impl Compiler {
             self.print_statement(chunk, parser);
         } else if parser.match_and_advance(TokenType::If) {
             self.if_statement(chunk, parser);
+        } else if parser.match_and_advance(TokenType::While) {
+            self.while_statement(chunk, parser);
         } else if parser.match_and_advance(TokenType::LeftBrace) {
             self.begin_block();
             self.block(parser, chunk);
@@ -524,7 +526,6 @@ impl Compiler {
                         "Cannot read local variable in its own initalizer".to_string(),
                     );
                 }
-                println!("Resolved local {} at {}", local.name.lexeme, i);
                 return Some(i as u8);
             }
         }
@@ -560,8 +561,6 @@ impl Compiler {
                 return;
             }
         }
-
-        println!("Adding new local named {}", new_local.name.lexeme);
         self.locals.push(new_local);
     }
 
@@ -607,6 +606,31 @@ impl Compiler {
         self.patch_jump(else_body_jump, chunk, parser);
     }
 
+    fn while_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
+        let loop_start = chunk.code.len();
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'while'".to_string());
+        // Compiling the expression value leaves it on the stack
+        self.expression(parser, chunk);
+        parser.consume(
+            TokenType::RightParen,
+            "Expect ')' after condition".to_string(),
+        );
+        // Check the value of the expression
+        let exit_jump = self.emit_jump(opcodes::OP_JUMP_IF_FALSE, parser.previous.line, chunk);
+        // Pop the condition if we don't jump
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+
+        // Eat the statement
+        self.statement(parser, chunk);
+
+        // Set the loop back to the start of the while expression
+        self.emit_loop(loop_start, chunk, parser);
+
+        // Set the jump point here
+        self.patch_jump(exit_jump, chunk, parser);
+        self.emit_byte(opcodes::OP_POP, chunk, parser.previous.line);
+    }
+
     fn emit_jump(&mut self, op: u8, line: u32, chunk: &mut Chunk) -> usize {
         self.emit_byte(op, chunk, line);
         // Emit two dummy bytes - expect these will be backpatched
@@ -624,6 +648,20 @@ impl Compiler {
 
         chunk.code[ind] = ((jump >> 8) & 0xFF) as u8;
         chunk.code[ind + 1] = (jump & 0xFF) as u8;
+    }
+
+    fn emit_loop(&mut self, start: usize, chunk: &mut Chunk, parser: &mut Parser) {
+        self.emit_byte(opcodes::OP_LOOP, chunk, parser.previous.line);
+
+        // Calculate offset to jump backwards by
+        // +2 to account for the offset bytes
+        let offset = chunk.code.len() - start + 2;
+        self.emit_bytes(
+            ((offset >> 8) & 0xFF) as u8,
+            (offset & 0xFF) as u8,
+            chunk,
+            parser.previous.line,
+        );
     }
 
     fn expression_statement(&mut self, chunk: &mut Chunk, parser: &mut Parser) {
@@ -662,7 +700,6 @@ impl Compiler {
         // i.e. var a; -> a == nil
         if parser.match_and_advance(TokenType::Equal) {
             self.expression(parser, chunk);
-            println!("Defining variable with lexeme: {}", parser.previous.lexeme);
         } else {
             self.emit_byte(opcodes::OP_NIL, chunk, parser.previous.line);
         }

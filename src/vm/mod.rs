@@ -267,6 +267,13 @@ impl VM {
                     self.ip += 2;
                     self.ip += offset;
                 }
+                opcodes::OP_LOOP => {
+                    let offset: usize = (((chunk.code[self.ip] as u16) << 8)
+                        | (chunk.code[self.ip + 1] as u16))
+                        as usize;
+                    // Jump is relative to two bytes after the opcode
+                    self.ip -= offset - 2;
+                }
                 _ => return InterpretResult::RuntimeError,
             }
         }

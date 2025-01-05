@@ -73,6 +73,7 @@ impl Chunk {
             opcodes::OP_GET_LOCAL => self.byte_instruction("OP_GET_LOCAL", offset),
             opcodes::OP_JUMP => self.jump_instruction("OP_JUMP", 1, offset),
             opcodes::OP_JUMP_IF_FALSE => self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset),
+            opcodes::OP_LOOP => self.jump_instruction("OP_LOOP", -1, offset),
             _ => {
                 println!("Invalid opcode {instruction}");
                 offset + 1 // Advance past the bad instruction
