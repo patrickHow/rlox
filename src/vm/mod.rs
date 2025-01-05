@@ -1,6 +1,5 @@
 use crate::chunk;
 use crate::opcodes;
-use crate::opcodes::OP_SET_LOCAL;
 use crate::value::Value;
 use std::collections::HashMap;
 

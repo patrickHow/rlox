@@ -5,7 +5,6 @@ use crate::token::{Token, TokenType, TOKEN_COUNT};
 use crate::value::Value;
 use core::panic;
 use std::ops::Add;
-use std::process::exit;
 
 const MAX_EXPRESSION_NESTING: u32 = 50;
 
@@ -273,8 +272,12 @@ impl Compiler {
             }
             self.emit_byte(opcodes::OP_POP, chunk, line);
         }
-        // ... and remove the locals from the vec
-        self.locals.truncate(i + 1);
+        // If we found no locals to keep (i.e., all locals were in this scope)
+        if i == 0 && !self.locals.is_empty() && self.locals[0].depth > self.scope_depth {
+            self.locals.clear(); // Remove all locals
+        } else {
+            self.locals.truncate(i + 1); // Keep locals up to and including i
+        }
     }
 
     // Starts at current token and parses any expression at the given precedence or higher

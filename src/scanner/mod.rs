@@ -220,8 +220,8 @@ impl Scanner {
                 '/' => {
                     // Two '/' in a row indicates a comment line
                     if self.peek_next(source).unwrap() == '/' {
-                        while self.peek(&source).unwrap() != '\n'
-                            && self.is_at_end(&source) == false
+                        while self.is_at_end(&source) == false
+                            && self.peek(&source).unwrap() != '\n'
                         {
                             self.advance(&source);
                         }

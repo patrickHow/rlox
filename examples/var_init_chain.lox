@@ -1,0 +1,12 @@
+print "In global scope";
+var a = 1;
+var b = a + 1;
+var c = b + 1;
+print c;  // Should print 3
+{
+    print "Entering local scope";
+    var a = 1;
+    var b = a + 1;
+    var c = b + 1;
+    print c;  // Should print 3
+}
